@@ -52,7 +52,8 @@ fun PredictorApp() {
     var menuAberto by remember { mutableStateOf(false) }
     var mensagem by remember { mutableStateOf("") }
     var carregando by remember { mutableStateOf(false) }
-
+    var usuarioLogado by remember { mutableStateOf(auth.currentUser != null) }
+    var nomeUsuario by remember { mutableStateOf("") }
     val fundo = when (time) {
         "Flamengo" -> Color(0xFF8B0000)
         "Palmeiras" -> Color(0xFF006437)
