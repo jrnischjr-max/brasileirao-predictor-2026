@@ -1038,20 +1038,11 @@ fun TelaPrincipal(nome: String, time: String) {
                 }
 
                 "Tabela" -> {
-                    Text(
-                        "🏆 CLASSIFICAÇÃO",
-                        color = corDestaque,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        "Aguardando integração da tabela oficial.",
-                        color = Color.LightGray,
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
-                }
-
+    TelaTabela(
+        corDestaque = corDestaque,
+        corCartao = corCartao
+    )
+}
                 "Palpites" -> {
                     Text(
                         "🎯 PALPITES INTELIGENTES",
