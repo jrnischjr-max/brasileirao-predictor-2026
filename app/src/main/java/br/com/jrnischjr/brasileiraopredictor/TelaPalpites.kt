@@ -6,6 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -16,13 +17,26 @@ fun TelaPalpites(
     corDestaque: Color,
     corCartao: Color
 ) {
+    val context = LocalContext.current
+
     val jogos = remember { mutableStateListOf<JSONObject>() }
     val clubes = remember { mutableStateListOf<JSONObject>() }
+    val historico = remember { mutableStateListOf<JSONObject>() }
 
     var carregando by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf("") }
     var jogosProntos by remember { mutableStateOf(false) }
     var tabelaPronta by remember { mutableStateOf(false) }
+
+    fun atualizarHistorico() {
+        val atualizados = HistoricoPalpites.atualizarResultados(
+            context,
+            jogos.toList()
+        )
+
+        historico.clear()
+        historico.addAll(atualizados)
+    }
 
     fun carregarDados() {
         carregando = true
@@ -40,6 +54,7 @@ fun TelaPalpites(
                         lista.optJSONObject(i)?.let { jogos.add(it) }
                     }
                 }
+
                 jogosProntos = true
             } else {
                 erro = mensagem ?: "Erro ao buscar jogos."
@@ -57,6 +72,7 @@ fun TelaPalpites(
                         lista.optJSONObject(i)?.let { clubes.add(it) }
                     }
                 }
+
                 tabelaPronta = true
             } else {
                 erro = mensagem ?: "Erro ao buscar classificação."
@@ -72,6 +88,8 @@ fun TelaPalpites(
     LaunchedEffect(jogosProntos, tabelaPronta) {
         if (jogosProntos && tabelaPronta) {
             carregando = false
+            atualizarHistorico()
+
             if (jogos.isEmpty() || clubes.isEmpty()) {
                 erro = "Não há dados suficientes para gerar os palpites."
             }
@@ -113,7 +131,22 @@ fun TelaPalpites(
         .sortedBy { it.optString("data") }
         .take(5)
 
+    val finalizados = historico.filter {
+        it.optBoolean("finalizado")
+    }
+
+    val acertos = finalizados.count {
+        it.optBoolean("acertouResultado")
+    }
+
+    val taxaAcerto = if (finalizados.isNotEmpty()) {
+        (acertos * 100) / finalizados.size
+    } else {
+        0
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
+
         Text(
             "🎯 PALPITES INTELIGENTES",
             color = corDestaque,
@@ -164,6 +197,7 @@ fun TelaPalpites(
 
         if (carregando) {
             CircularProgressIndicator(color = corDestaque)
+
             Text(
                 "Analisando os clubes e partidas...",
                 color = Color.White,
@@ -182,6 +216,7 @@ fun TelaPalpites(
         }
 
         if (!carregando && erro.isEmpty() && jogosProntos && tabelaPronta) {
+
             if (proximosJogos.isEmpty()) {
                 Text(
                     "Não há partidas futuras disponíveis no momento.",
@@ -190,11 +225,16 @@ fun TelaPalpites(
             }
 
             proximosJogos.forEach { jogo ->
+
                 val mandante = jogo.optJSONObject("mandante")
                     ?.optString("nome", "") ?: ""
 
                 val visitante = jogo.optJSONObject("visitante")
                     ?.optString("nome", "") ?: ""
+
+                val idJogo = jogo.optString("id").ifBlank {
+                    "${jogo.optString("rodada")}_${jogo.optString("data")}_${mandante}_${visitante}"
+                }
 
                 val analise = MotorPalpites.analisar(
                     jogo = jogo,
@@ -203,6 +243,11 @@ fun TelaPalpites(
                 )
 
                 if (analise != null) {
+
+                    val jaSalvo = historico.any {
+                        it.optString("idJogo") == idJogo
+                    }
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -292,11 +337,13 @@ fun TelaPalpites(
                                     color = corDestaque,
                                     fontWeight = FontWeight.Bold
                                 )
+
                                 Text(
                                     "${analise.probEmpate}%",
                                     color = corDestaque,
                                     fontWeight = FontWeight.Bold
                                 )
+
                                 Text(
                                     "${analise.probFora}%",
                                     color = corDestaque,
@@ -312,6 +359,33 @@ fun TelaPalpites(
                                 fontWeight = FontWeight.Black,
                                 fontSize = 15.sp
                             )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = {
+                                    HistoricoPalpites.salvar(
+                                        context,
+                                        jogo,
+                                        analise
+                                    )
+
+                                    atualizarHistorico()
+                                },
+                                enabled = !jaSalvo,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = corDestaque,
+                                    disabledContainerColor = Color.DarkGray
+                                )
+                            ) {
+                                Text(
+                                    if (jaSalvo) "✓ PALPITE SALVO"
+                                    else "💾 SALVAR PALPITE",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -325,6 +399,136 @@ fun TelaPalpites(
             ) {
                 Text("ATUALIZAR PALPITES")
             }
+        }
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        Divider(color = corDestaque.copy(alpha = 0.5f))
+
+        Spacer(modifier = Modifier.height(15.dp))
+
+        Text(
+            "📊 MEU HISTÓRICO",
+            color = corDestaque,
+            fontSize = 19.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = corCartao)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+
+                Text(
+                    "PALPITES SALVOS: ${historico.size}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    "JOGOS FINALIZADOS: ${finalizados.size}",
+                    color = Color.LightGray,
+                    fontSize = 12.sp
+                )
+
+                Text(
+                    "RESULTADOS ACERTADOS: $acertos",
+                    color = corDestaque,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+
+                Text(
+                    "TAXA DE ACERTO: $taxaAcerto%",
+                    color = corDestaque,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 20.sp
+                )
+
+                Text(
+                    "Placar exato: ${finalizados.count { it.optBoolean("acertouPlacar") }}",
+                    color = Color.LightGray,
+                    fontSize = 12.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        historico.sortedByDescending {
+            it.optString("data")
+        }.take(10).forEach { palpite ->
+
+            val finalizado = palpite.optBoolean("finalizado")
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = corCartao
+                )
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+
+                    Text(
+                        "${palpite.optString("mandante")} x ${palpite.optString("visitante")}",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        "Palpite: ${palpite.optInt("placarCasa")} x ${palpite.optInt("placarFora")}",
+                        color = Color.LightGray,
+                        fontSize = 12.sp
+                    )
+
+                    if (finalizado) {
+                        Text(
+                            "Resultado real: ${palpite.optInt("golsReaisCasa")} x ${palpite.optInt("golsReaisFora")}",
+                            color = Color.White,
+                            fontSize = 12.sp
+                        )
+
+                        Text(
+                            if (palpite.optBoolean("acertouResultado"))
+                                "✓ Resultado acertado"
+                            else
+                                "✗ Resultado não acertado",
+                            color = if (palpite.optBoolean("acertouResultado"))
+                                corDestaque else Color.LightGray,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        if (palpite.optBoolean("acertouPlacar")) {
+                            Text(
+                                "🏆 PLACAR EXATO!",
+                                color = corDestaque,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    } else {
+                        Text(
+                            "Aguardando resultado",
+                            color = corDestaque,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        if (historico.isEmpty()) {
+            Text(
+                "Seus palpites salvos aparecerão aqui.",
+                color = Color.LightGray,
+                fontSize = 12.sp
+            )
         }
     }
 }
