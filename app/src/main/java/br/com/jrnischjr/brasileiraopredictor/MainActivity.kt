@@ -615,15 +615,18 @@ fun PredictorApp() {
 }
 
 
-
-
+   
 @Composable
 fun TelaPrincipal(nome: String, time: String) {
     var abaSelecionada by remember { mutableStateOf("Início") }
-
     var carregandoJogos by remember { mutableStateOf(false) }
     var erroJogos by remember { mutableStateOf("") }
-    val jogos = remember { mutableStateListOf<org.json.JSONObject>() }
+    var rodadaSelecionada by remember { mutableStateOf<Int?>(null) }
+    var menuRodadasAberto by remember { mutableStateOf(false) }
+
+    val jogos = remember {
+        mutableStateListOf<org.json.JSONObject>()
+    }
 
     val corFundo = when (time) {
         "Flamengo", "Vasco", "Corinthians", "Santos" -> Color(0xFF101010)
@@ -657,34 +660,93 @@ fun TelaPrincipal(nome: String, time: String) {
 
     val abas = listOf("Início", "Jogos", "Tabela", "Palpites")
 
-    LaunchedEffect(abaSelecionada) {
-        if (abaSelecionada == "Jogos" && jogos.isEmpty() && !carregandoJogos) {
-            carregandoJogos = true
-            erroJogos = ""
+    fun formatarDataBrasil(dataUtc: String): String {
+        return try {
+            if (dataUtc.length < 19) {
+                return "Data a confirmar"
+            }
 
-            DadosBrasileirao.buscarJogos { dados, erro ->
-                carregandoJogos = false
+            val formatoEntrada = java.text.SimpleDateFormat(
+                "yyyy-MM-dd'T'HH:mm:ss",
+                java.util.Locale.US
+            ).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }
 
-                if (dados != null) {
-                    val lista = dados.optJSONArray("jogos")
-                    jogos.clear()
+            val dataConvertida = formatoEntrada.parse(dataUtc.substring(0, 19))
+                ?: return "Data a confirmar"
 
-                    if (lista != null) {
-                        for (i in 0 until lista.length()) {
-                            val jogo = lista.optJSONObject(i)
-                            if (jogo != null) {
-                                jogos.add(jogo)
-                            }
+            val formatoSaida = java.text.SimpleDateFormat(
+                "dd/MM/yyyy • HH:mm",
+                java.util.Locale("pt", "BR")
+            ).apply {
+                timeZone = java.util.TimeZone.getTimeZone("America/Sao_Paulo")
+            }
+
+            formatoSaida.format(dataConvertida)
+        } catch (e: Exception) {
+            "Data a confirmar"
+        }
+    }
+
+    fun carregarJogos() {
+        carregandoJogos = true
+        erroJogos = ""
+
+        DadosBrasileirao.buscarJogos { dados, erro ->
+            carregandoJogos = false
+
+            if (dados != null) {
+                val lista = dados.optJSONArray("jogos")
+                jogos.clear()
+
+                if (lista != null) {
+                    for (i in 0 until lista.length()) {
+                        val jogo = lista.optJSONObject(i)
+                        if (jogo != null) {
+                            jogos.add(jogo)
                         }
                     }
-
-                    if (jogos.isEmpty()) {
-                        erroJogos = "Nenhum jogo foi encontrado."
-                    }
-                } else {
-                    erroJogos = erro ?: "Não foi possível carregar os jogos."
                 }
+
+                if (jogos.isEmpty()) {
+                    erroJogos = "Nenhum jogo foi encontrado."
+                } else {
+                    val proximoJogo = jogos.firstOrNull { jogo ->
+                        val situacao = jogo.optString("situacao").uppercase()
+                        situacao != "FINISHED" &&
+                        situacao != "FINALIZADO" &&
+                        situacao != "AWARDED"
+                    }
+
+                    rodadaSelecionada =
+                        proximoJogo?.optString("rodada")?.toIntOrNull()
+                            ?: jogos.firstOrNull()
+                                ?.optString("rodada")
+                                ?.toIntOrNull()
+                }
+            } else {
+                erroJogos = erro ?: "Não foi possível carregar os jogos."
             }
+        }
+    }
+
+    val rodadasDisponiveis = jogos
+        .mapNotNull { it.optString("rodada").toIntOrNull() }
+        .distinct()
+        .sorted()
+
+    val jogosDaRodada = jogos.filter {
+        it.optString("rodada").toIntOrNull() == rodadaSelecionada
+    }
+
+    LaunchedEffect(abaSelecionada) {
+        if (
+            abaSelecionada == "Jogos" &&
+            jogos.isEmpty() &&
+            !carregandoJogos
+        ) {
+            carregarJogos()
         }
     }
 
@@ -793,7 +855,7 @@ fun TelaPrincipal(nome: String, time: String) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        "Calendário oficial • Dados atualizados pela API",
+                        "Calendário oficial • Horário de Brasília",
                         color = Color.LightGray,
                         fontSize = 12.sp
                     )
@@ -818,67 +880,87 @@ fun TelaPrincipal(nome: String, time: String) {
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        Button(
-                            onClick = {
-                                erroJogos = ""
-                                carregandoJogos = true
-
-                                DadosBrasileirao.buscarJogos { dados, erro ->
-                                    carregandoJogos = false
-
-                                    if (dados != null) {
-                                        val lista = dados.optJSONArray("jogos")
-                                        jogos.clear()
-
-                                        if (lista != null) {
-                                            for (i in 0 until lista.length()) {
-                                                val jogo = lista.optJSONObject(i)
-                                                if (jogo != null) jogos.add(jogo)
-                                            }
-                                        }
-
-                                        if (jogos.isEmpty()) {
-                                            erroJogos = "Nenhum jogo foi encontrado."
-                                        }
-                                    } else {
-                                        erroJogos = erro ?: "Falha na consulta."
-                                    }
-                                }
-                            }
-                        ) {
+                        Button(onClick = { carregarJogos() }) {
                             Text("TENTAR NOVAMENTE")
                         }
                     }
 
                     if (jogos.isNotEmpty()) {
                         Text(
-                            "${jogos.size} partidas encontradas",
+                            "${jogos.size} partidas no campeonato",
                             color = corDestaque,
                             fontWeight = FontWeight.Bold
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        jogos.forEach { jogo ->
+                        Box {
+                            OutlinedButton(
+                                onClick = {
+                                    menuRodadasAberto = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if (rodadaSelecionada != null)
+                                        "⚽  RODADA $rodadaSelecionada  ▼"
+                                    else
+                                        "SELECIONAR RODADA"
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = menuRodadasAberto,
+                                onDismissRequest = {
+                                    menuRodadasAberto = false
+                                }
+                            ) {
+                                rodadasDisponiveis.forEach { rodada ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text("Rodada $rodada")
+                                        },
+                                        onClick = {
+                                            rodadaSelecionada = rodada
+                                            menuRodadasAberto = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            "${jogosDaRodada.size} jogos nesta rodada",
+                            color = Color.LightGray,
+                            fontSize = 12.sp
+                        )
+
+                        jogosDaRodada.forEach { jogo ->
                             val mandante = jogo.optJSONObject("mandante")
                             val visitante = jogo.optJSONObject("visitante")
                             val placar = jogo.optJSONObject("placar")
 
-                            val nomeMandante = mandante?.optString("nome", "Mandante")
-                                ?: "Mandante"
-                            val nomeVisitante = visitante?.optString("nome", "Visitante")
-                                ?: "Visitante"
+                            val nomeMandante =
+                                mandante?.optString("nome", "Mandante")
+                                    ?: "Mandante"
 
-                            val golsMandante = placar?.optInt("mandante", -1) ?: -1
-                            val golsVisitante = placar?.optInt("visitante", -1) ?: -1
+                            val nomeVisitante =
+                                visitante?.optString("nome", "Visitante")
+                                    ?: "Visitante"
+
+                            val golsMandante =
+                                placar?.optInt("mandante", -1) ?: -1
+
+                            val golsVisitante =
+                                placar?.optInt("visitante", -1) ?: -1
 
                             val data = jogo.optString("data", "")
-                            val dataExibida = data
-                                .replace("T", " ")
-                                .take(16)
+                            val dataExibida = formatarDataBrasil(data)
 
-                            val rodada = jogo.optString("rodada", "")
-                            val situacao = jogo.optString("situacao", "A confirmar")
+                            val situacao =
+                                jogo.optString("situacao", "A confirmar")
 
                             Card(
                                 modifier = Modifier
@@ -894,7 +976,7 @@ fun TelaPrincipal(nome: String, time: String) {
                                         .padding(14.dp)
                                 ) {
                                     Text(
-                                        "RODADA $rodada",
+                                        "RODADA $rodadaSelecionada",
                                         color = corDestaque,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
@@ -1034,3 +1116,4 @@ fun TelaPrincipal(nome: String, time: String) {
         }
     }
 }
+               
