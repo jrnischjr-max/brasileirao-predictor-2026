@@ -751,10 +751,12 @@ fun TelaPrincipal(nome: String, time: String) {
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(corFundo)
-    ) {
+    modifier = Modifier
+        .fillMaxSize()
+        .background(corFundo)
+        .navigationBarsPadding()
+) {
+    
         Column(
             modifier = Modifier
                 .weight(1f)
