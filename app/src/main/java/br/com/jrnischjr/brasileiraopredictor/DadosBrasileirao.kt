@@ -1,3 +1,4 @@
+
 package br.com.jrnischjr.brasileiraopredictor
 
 import android.os.Handler
@@ -11,14 +12,15 @@ object DadosBrasileirao {
     private const val BASE_URL =
         "https://cold-sbrasileirao-predictor-apiilence-07ef.jrnischjr.workers.dev/"
 
-    fun buscarJogos(
+    private fun buscarDados(
+        endpoint: String,
         callback: (JSONObject?, String?) -> Unit
     ) {
         Thread {
             var conexao: HttpURLConnection? = null
 
             try {
-                val url = URL("${BASE_URL}?endpoint=fd-matches")
+                val url = URL("${BASE_URL}?endpoint=$endpoint")
                 conexao = url.openConnection() as HttpURLConnection
 
                 conexao.requestMethod = "GET"
@@ -49,11 +51,10 @@ object DadosBrasileirao {
                 }
 
             } catch (erro: Exception) {
-
                 Handler(Looper.getMainLooper()).post {
                     callback(
                         null,
-                        erro.message ?: "Falha ao buscar os jogos."
+                        erro.message ?: "Falha ao buscar os dados."
                     )
                 }
 
@@ -61,5 +62,17 @@ object DadosBrasileirao {
                 conexao?.disconnect()
             }
         }.start()
+    }
+
+    fun buscarJogos(
+        callback: (JSONObject?, String?) -> Unit
+    ) {
+        buscarDados("fd-matches", callback)
+    }
+
+    fun buscarClassificacao(
+        callback: (JSONObject?, String?) -> Unit
+    ) {
+        buscarDados("fd-standings", callback)
     }
 }
