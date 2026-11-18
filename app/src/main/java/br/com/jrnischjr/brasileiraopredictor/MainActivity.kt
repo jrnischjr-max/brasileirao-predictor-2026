@@ -46,6 +46,7 @@ fun PredictorApp() {
     var nome by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
+    var senhaVisivel by remember { mutableStateOf(false) }
     var time by remember { mutableStateOf("") }
     var cadastro by remember { mutableStateOf(true) }
     var menuAberto by remember { mutableStateOf(false) }
@@ -125,11 +126,22 @@ fun PredictorApp() {
                     Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
-                        value = senha,
-                        onValueChange = { senha = it },
-                        label = { Text("Senha") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+    value = senha,
+    onValueChange = { senha = it },
+    label = { Text("Senha") },
+    modifier = Modifier.fillMaxWidth(),
+    visualTransformation = if (senhaVisivel)
+        androidx.compose.ui.text.input.VisualTransformation.None
+    else
+        androidx.compose.ui.text.input.PasswordVisualTransformation(),
+    trailingIcon = {
+        TextButton(
+            onClick = { senhaVisivel = !senhaVisivel }
+        ) {
+            Text(if (senhaVisivel) "Ocultar" else "Mostrar")
+        }
+    }
+)
 
                     if (cadastro) {
                         Spacer(modifier = Modifier.height(15.dp))
