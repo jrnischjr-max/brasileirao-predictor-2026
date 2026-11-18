@@ -1,11 +1,12 @@
-
-
 package br.com.jrnischjr.brasileiraopredictor
 
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +22,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -38,6 +40,7 @@ fun PredictorApp() {
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
     val context = LocalContext.current
+    val activity = context as? FragmentActivity
 
     val preferencias = remember {
         context.getSharedPreferences(
@@ -59,6 +62,7 @@ fun PredictorApp() {
 
     val salvarEmail: (String) -> Unit = { novoEmail ->
         val atualizados = (emailsSalvos + novoEmail).distinct()
+
         preferencias.edit()
             .putStringSet("emails_salvos", atualizados.toSet())
             .apply()
@@ -93,6 +97,8 @@ fun PredictorApp() {
     }
 
     var nomeUsuario by remember { mutableStateOf("") }
+    var biometriaLiberada by remember { mutableStateOf(false) }
+    var autenticacaoIniciada by remember { mutableStateOf(false) }
 
     val fundo = when (time) {
         "Flamengo" -> Color(0xFFC8102E)
@@ -106,6 +112,101 @@ fun PredictorApp() {
         "Cruzeiro" -> Color(0xFF0755A5)
         "Fluminense" -> Color(0xFF7A1025)
         else -> Color(0xFF063B2B)
+    }
+
+    val iniciarBiometria: () -> Unit = {
+        if (!autenticacaoIniciada && !biometriaLiberada) {
+            if (activity == null) {
+                mensagem = "Não foi possível iniciar a autenticação."
+            } else {
+                autenticacaoIniciada = true
+                mensagem = ""
+
+                val autenticadores =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                    } else {
+                        BiometricManager.Authenticators.BIOMETRIC_WEAK
+                    }
+
+                val gerente = BiometricManager.from(activity)
+                val disponibilidade =
+                    gerente.canAuthenticate(autenticadores)
+
+                if (
+                    disponibilidade !=
+                    BiometricManager.BIOMETRIC_SUCCESS
+                ) {
+                    autenticacaoIniciada = false
+
+                    mensagem = when (disponibilidade) {
+                        BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE ->
+                            "Este aparelho não possui leitor biométrico."
+
+                        BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE ->
+                            "Leitor biométrico temporariamente indisponível."
+
+                        BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ->
+                            "Cadastre uma digital ou configure o bloqueio do celular."
+
+                        else ->
+                            "Não foi possível utilizar a autenticação deste aparelho."
+                    }
+                } else {
+                    val executor =
+                        ContextCompat.getMainExecutor(activity)
+
+                    val prompt = BiometricPrompt(
+                        activity,
+                        executor,
+                        object : BiometricPrompt.AuthenticationCallback() {
+
+                            override fun onAuthenticationSucceeded(
+                                result: BiometricPrompt.AuthenticationResult
+                            ) {
+                                super.onAuthenticationSucceeded(result)
+                                biometriaLiberada = true
+                                autenticacaoIniciada = false
+                                mensagem = ""
+                            }
+
+                            override fun onAuthenticationFailed() {
+                                super.onAuthenticationFailed()
+                                mensagem = "Digital não reconhecida. Tente novamente."
+                            }
+
+                            override fun onAuthenticationError(
+                                errorCode: Int,
+                                errString: CharSequence
+                            ) {
+                                super.onAuthenticationError(
+                                    errorCode,
+                                    errString
+                                )
+                                autenticacaoIniciada = false
+                                mensagem = errString.toString()
+                            }
+                        }
+                    )
+
+                    val construtor =
+                        BiometricPrompt.PromptInfo.Builder()
+                            .setTitle("Brasileirão Predictor")
+                            .setSubtitle("Confirme sua identidade para continuar")
+                            .setDescription(
+                                "Use sua digital ou a credencial de bloqueio do celular."
+                            )
+                            .setAllowedAuthenticators(autenticadores)
+
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                        construtor.setNegativeButtonText("Cancelar")
+                    }
+
+                    prompt.authenticate(construtor.build())
+                }
+            }
+        }
     }
 
     LaunchedEffect(auth.currentUser?.uid) {
@@ -134,8 +235,19 @@ fun PredictorApp() {
         }
     }
 
+    LaunchedEffect(usuarioLogado, auth.currentUser?.uid) {
+        if (
+            usuarioLogado &&
+            auth.currentUser != null &&
+            !biometriaLiberada &&
+            !autenticacaoIniciada
+        ) {
+            iniciarBiometria()
+        }
+    }
+
     MaterialTheme {
-        if (usuarioLogado) {
+        if (usuarioLogado && biometriaLiberada) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -145,6 +257,74 @@ fun PredictorApp() {
                     nome = nomeUsuario,
                     time = time
                 )
+            }
+        } else if (usuarioLogado) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(fundo)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    "BRASILEIRÃO PREDICTOR",
+                    color = Color.White,
+                    fontSize = 25.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(35.dp))
+
+                Text(
+                    "ACESSO PROTEGIDO",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+                Text(
+                    "Confirme sua identidade para acessar o aplicativo.",
+                    color = Color.White,
+                    fontSize = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                if (mensagem.isNotEmpty()) {
+                    Text(
+                        mensagem,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(15.dp))
+                }
+
+                Button(
+                    onClick = iniciarBiometria,
+                    enabled = !autenticacaoIniciada &&
+                        !biometriaLiberada
+                ) {
+                    Text("TENTAR NOVAMENTE")
+                }
+
+                TextButton(
+                    onClick = {
+                        auth.signOut()
+                        usuarioLogado = false
+                        biometriaLiberada = false
+                        autenticacaoIniciada = false
+                        cadastro = false
+                        mensagem = ""
+                    }
+                ) {
+                    Text(
+                        "SAIR DA CONTA",
+                        color = Color.White
+                    )
+                }
             }
         } else {
             Column(
