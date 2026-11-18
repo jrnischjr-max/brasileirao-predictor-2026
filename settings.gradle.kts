@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "BrasileiraoPredictor"
-include(":app")
+include(":app") 
