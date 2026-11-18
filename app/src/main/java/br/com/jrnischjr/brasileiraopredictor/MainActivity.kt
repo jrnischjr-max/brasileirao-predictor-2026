@@ -614,16 +614,55 @@ fun PredictorApp() {
     }
 }
 
+
 @Composable
 fun TelaPrincipal(nome: String, time: String) {
     var abaSelecionada by remember { mutableStateOf("Início") }
+
+    val corFundo = when (time) {
+        "Flamengo", "Vasco", "Corinthians", "Santos" ->
+            Color(0xFF101010)
+        "Palmeiras" -> Color(0xFF071C12)
+        "São Paulo" -> Color(0xFF19090C)
+        "Grêmio", "Cruzeiro" -> Color(0xFF081629)
+        "Internacional" -> Color(0xFF1B0808)
+        "Fluminense" -> Color(0xFF19080D)
+        "Botafogo" -> Color(0xFF101010)
+        "Bahia" -> Color(0xFF081525)
+        else -> Color(0xFF101820)
+    }
+
+    val corCartao = when (time) {
+        "Flamengo" -> Color(0xFF281017)
+        "Palmeiras" -> Color(0xFF123D29)
+        "Corinthians", "Vasco", "Santos" -> Color(0xFF292929)
+        "São Paulo" -> Color(0xFF42121A)
+        "Grêmio", "Cruzeiro" -> Color(0xFF15385C)
+        "Internacional" -> Color(0xFF491515)
+        "Fluminense" -> Color(0xFF4A1425)
+        "Botafogo" -> Color(0xFF292929)
+        "Bahia" -> Color(0xFF163D65)
+        else -> Color(0xFF263746)
+    }
+
+    val corDestaque = when (time) {
+        "Flamengo", "Internacional", "São Paulo" ->
+            Color(0xFFFF354D)
+        "Palmeiras" -> Color(0xFF4ADE80)
+        "Corinthians", "Vasco", "Santos" ->
+            Color(0xFFFFD54F)
+        "Grêmio", "Cruzeiro", "Bahia" ->
+            Color(0xFF55B8FF)
+        "Fluminense" -> Color(0xFFE65B83)
+        else -> Color(0xFFFFD54F)
+    }
 
     val abas = listOf("Início", "Jogos", "Tabela", "Palpites")
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF101820))
+            .background(corFundo)
     ) {
         Column(
             modifier = Modifier
@@ -640,7 +679,7 @@ fun TelaPrincipal(nome: String, time: String) {
 
             Text(
                 "PREDICTOR 2026  •  BY NISCH",
-                color = Color(0xFFFFD54F),
+                color = corDestaque,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -650,7 +689,7 @@ fun TelaPrincipal(nome: String, time: String) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF263746)
+                    containerColor = corCartao
                 )
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
@@ -671,7 +710,7 @@ fun TelaPrincipal(nome: String, time: String) {
 
                     Text(
                         "⚽ $time",
-                        color = Color(0xFFFFD54F),
+                        color = corDestaque,
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -702,7 +741,7 @@ fun TelaPrincipal(nome: String, time: String) {
                         .fillMaxWidth()
                         .padding(vertical = 5.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF263746)
+                        containerColor = corCartao
                     ),
                     onClick = {
                         abaSelecionada = when (secao.second) {
@@ -719,10 +758,7 @@ fun TelaPrincipal(nome: String, time: String) {
                             .padding(17.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            secao.first,
-                            fontSize = 30.sp
-                        )
+                        Text(secao.first, fontSize = 30.sp)
 
                         Spacer(modifier = Modifier.width(15.dp))
 
@@ -733,6 +769,7 @@ fun TelaPrincipal(nome: String, time: String) {
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
                             )
+
                             Text(
                                 secao.third,
                                 color = Color.LightGray,
@@ -748,13 +785,13 @@ fun TelaPrincipal(nome: String, time: String) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF263746)
+                    containerColor = corCartao
                 )
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
                         "📅 RODADA DO BRASILEIRÃO",
-                        color = Color(0xFFFFD54F),
+                        color = corDestaque,
                         fontWeight = FontWeight.Bold
                     )
 
@@ -780,7 +817,7 @@ fun TelaPrincipal(nome: String, time: String) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF263746))
+                .background(corCartao)
                 .padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
@@ -791,7 +828,7 @@ fun TelaPrincipal(nome: String, time: String) {
                     Text(
                         aba,
                         color = if (abaSelecionada == aba)
-                            Color(0xFFFFD54F)
+                            corDestaque
                         else
                             Color.White,
                         fontWeight = FontWeight.Bold,
