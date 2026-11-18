@@ -10,6 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONObject
+import androidx.compose.ui.Alignment
 
 @Composable
 fun TelaPalpites(
@@ -332,37 +333,76 @@ fun TelaPalpites(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            Text(
-                                mandante,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
+                            
+Row(
+    modifier = Modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically
+) {
+    Row(
+        modifier = Modifier.weight(1f),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        EscudoClube(
+            url = jogo.optJSONObject("mandante")?.optString("escudo"),
+            nome = mandante,
+            tamanho = 34.dp
+        )
 
-                            Text(
-                                "Forma recente: ${analise.formaCasa}",
-                                color = corDestaque,
-                                fontSize = 11.sp
-                            )
+        Spacer(modifier = Modifier.width(6.dp))
 
-                            Text(
-                                "              x",
-                                color = corDestaque,
-                                fontWeight = FontWeight.Black
-                            )
+        Column {
+            Text(
+                mandante,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
 
-                            Text(
-                                visitante,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
+            Text(
+                "Forma: ${analise.formaCasa}",
+                color = corDestaque,
+                fontSize = 10.sp
+            )
+        }
+    }
 
-                            Text(
-                                "Forma recente: ${analise.formaFora}",
-                                color = corDestaque,
-                                fontSize = 11.sp
-                            )
+    Text(
+        "X",
+        color = corDestaque,
+        fontWeight = FontWeight.Black,
+        fontSize = 18.sp
+    )
+
+    Row(
+        modifier = Modifier.weight(1f),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                visitante,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
+
+            Text(
+                "Forma: ${analise.formaFora}",
+                color = corDestaque,
+                fontSize = 10.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.width(6.dp))
+
+        EscudoClube(
+            url = jogo.optJSONObject("visitante")?.optString("escudo"),
+            nome = visitante,
+            tamanho = 34.dp
+        )
+    }
+}
+
 
                             Spacer(modifier = Modifier.height(12.dp))
 
