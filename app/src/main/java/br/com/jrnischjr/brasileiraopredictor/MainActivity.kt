@@ -1049,7 +1049,7 @@ fun TelaPrincipal(nome: String, time: String) {
         corCartao = corCartao
     )
                 }
-
+            }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
