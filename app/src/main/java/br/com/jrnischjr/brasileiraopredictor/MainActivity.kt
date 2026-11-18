@@ -57,7 +57,7 @@ fun PredictorApp() {
     var nomeUsuario by remember { mutableStateOf("") }
 
     val fundo = when (time) {
-        "Flamengo" -> Color(0xFF8B0000)
+        "Flamengo" -> Color(0xFFC8102E)
         "Palmeiras" -> Color(0xFF006437)
         "Corinthians" -> Color(0xFF292929)
         "São Paulo" -> Color(0xFFB00020)
@@ -129,7 +129,7 @@ fun PredictorApp() {
 
                 Text(
                     "PREDICTOR 2026",
-                    color = Color(0xFFFFD54F),
+                    color = Color.White,
                     fontSize = 23.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -402,7 +402,7 @@ fun TelaPrincipal(nome: String, time: String) {
 
         Text(
             "CAMPEONATO BRASILEIRO 2026",
-            color = Color(0xFFFFD54F),
+            color = Color.White,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
