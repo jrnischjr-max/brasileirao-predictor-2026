@@ -992,37 +992,63 @@ fun TelaPrincipal(nome: String, time: String) {
 
                                     Spacer(modifier = Modifier.height(10.dp))
 
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            nomeMandante,
-                                            color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.weight(1f)
-                                        )
+                                    
+Row(
+    modifier = Modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically
+) {
+    Row(
+        modifier = Modifier.weight(1f),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        EscudoClube(
+            url = mandante?.optString("escudo"),
+            nome = nomeMandante,
+            tamanho = 30.dp
+        )
 
-                                        Text(
-                                            if (golsMandante >= 0 && golsVisitante >= 0)
-                                                "$golsMandante x $golsVisitante"
-                                            else
-                                                " x ",
-                                            color = corDestaque,
-                                            fontSize = 18.sp,
-                                            fontWeight = FontWeight.Black
-                                        )
+        Spacer(modifier = Modifier.width(6.dp))
 
-                                        Text(
-                                            nomeVisitante,
-                                            color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
+        Text(
+            nomeMandante,
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+
+    Text(
+        if (golsMandante >= 0 && golsVisitante >= 0)
+            "$golsMandante x $golsVisitante"
+        else
+            " x ",
+        color = corDestaque,
+        fontSize = 18.sp,
+        fontWeight = FontWeight.Black
+    )
+
+    Row(
+        modifier = Modifier.weight(1f),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            nomeVisitante,
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.width(6.dp))
+
+        EscudoClube(
+            url = visitante?.optString("escudo"),
+            nome = nomeVisitante,
+            tamanho = 30.dp
+        )
+    }
+}
+
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
