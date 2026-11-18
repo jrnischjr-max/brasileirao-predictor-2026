@@ -616,9 +616,14 @@ fun PredictorApp() {
 
 
 
+
 @Composable
 fun TelaPrincipal(nome: String, time: String) {
     var abaSelecionada by remember { mutableStateOf("Início") }
+
+    var carregandoJogos by remember { mutableStateOf(false) }
+    var erroJogos by remember { mutableStateOf("") }
+    val jogos = remember { mutableStateListOf<org.json.JSONObject>() }
 
     val corFundo = when (time) {
         "Flamengo", "Vasco", "Corinthians", "Santos" -> Color(0xFF101010)
@@ -650,15 +655,38 @@ fun TelaPrincipal(nome: String, time: String) {
         else -> Color(0xFFFFD54F)
     }
 
-    val clubes = listOf(
-        "Athletico-PR", "Atlético-MG", "Bahia", "Botafogo",
-        "Corinthians", "Coritiba", "Cruzeiro", "Flamengo",
-        "Fluminense", "Grêmio", "Internacional", "Mirassol",
-        "Palmeiras", "Red Bull Bragantino", "Santos",
-        "São Paulo", "Vasco", "Vitória", "Chapecoense", "Remo"
-    )
-
     val abas = listOf("Início", "Jogos", "Tabela", "Palpites")
+
+    LaunchedEffect(abaSelecionada) {
+        if (abaSelecionada == "Jogos" && jogos.isEmpty() && !carregandoJogos) {
+            carregandoJogos = true
+            erroJogos = ""
+
+            DadosBrasileirao.buscarJogos { dados, erro ->
+                carregandoJogos = false
+
+                if (dados != null) {
+                    val lista = dados.optJSONArray("jogos")
+                    jogos.clear()
+
+                    if (lista != null) {
+                        for (i in 0 until lista.length()) {
+                            val jogo = lista.optJSONObject(i)
+                            if (jogo != null) {
+                                jogos.add(jogo)
+                            }
+                        }
+                    }
+
+                    if (jogos.isEmpty()) {
+                        erroJogos = "Nenhum jogo foi encontrado."
+                    }
+                } else {
+                    erroJogos = erro ?: "Não foi possível carregar os jogos."
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -756,22 +784,173 @@ fun TelaPrincipal(nome: String, time: String) {
 
                 "Jogos" -> {
                     Text(
-                        "⚽ JOGOS DO BRASILEIRÃO",
+                        "⚽ JOGOS DO BRASILEIRÃO 2026",
                         color = corDestaque,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        "Calendário oficial • Dados atualizados pela API",
+                        color = Color.LightGray,
+                        fontSize = 12.sp
+                    )
+
                     Spacer(modifier = Modifier.height(15.dp))
-                    Text(
-                        "Calendário e confrontos",
-                        color = Color.White,
-                        fontSize = 17.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        "Em breve: partidas, horários, resultados e rodadas do campeonato.",
-                        color = Color.LightGray
-                    )
+
+                    if (carregandoJogos) {
+                        CircularProgressIndicator(color = corDestaque)
+                        Text(
+                            "Buscando partidas...",
+                            color = Color.White,
+                            modifier = Modifier.padding(top = 10.dp)
+                        )
+                    }
+
+                    if (erroJogos.isNotEmpty()) {
+                        Text(
+                            erroJogos,
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Button(
+                            onClick = {
+                                erroJogos = ""
+                                carregandoJogos = true
+
+                                DadosBrasileirao.buscarJogos { dados, erro ->
+                                    carregandoJogos = false
+
+                                    if (dados != null) {
+                                        val lista = dados.optJSONArray("jogos")
+                                        jogos.clear()
+
+                                        if (lista != null) {
+                                            for (i in 0 until lista.length()) {
+                                                val jogo = lista.optJSONObject(i)
+                                                if (jogo != null) jogos.add(jogo)
+                                            }
+                                        }
+
+                                        if (jogos.isEmpty()) {
+                                            erroJogos = "Nenhum jogo foi encontrado."
+                                        }
+                                    } else {
+                                        erroJogos = erro ?: "Falha na consulta."
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("TENTAR NOVAMENTE")
+                        }
+                    }
+
+                    if (jogos.isNotEmpty()) {
+                        Text(
+                            "${jogos.size} partidas encontradas",
+                            color = corDestaque,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        jogos.forEach { jogo ->
+                            val mandante = jogo.optJSONObject("mandante")
+                            val visitante = jogo.optJSONObject("visitante")
+                            val placar = jogo.optJSONObject("placar")
+
+                            val nomeMandante = mandante?.optString("nome", "Mandante")
+                                ?: "Mandante"
+                            val nomeVisitante = visitante?.optString("nome", "Visitante")
+                                ?: "Visitante"
+
+                            val golsMandante = placar?.optInt("mandante", -1) ?: -1
+                            val golsVisitante = placar?.optInt("visitante", -1) ?: -1
+
+                            val data = jogo.optString("data", "")
+                            val dataExibida = data
+                                .replace("T", " ")
+                                .take(16)
+
+                            val rodada = jogo.optString("rodada", "")
+                            val situacao = jogo.optString("situacao", "A confirmar")
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 5.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = corCartao
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp)
+                                ) {
+                                    Text(
+                                        "RODADA $rodada",
+                                        color = corDestaque,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    Text(
+                                        dataExibida,
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp
+                                    )
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            nomeMandante,
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+
+                                        Text(
+                                            if (golsMandante >= 0 && golsVisitante >= 0)
+                                                "$golsMandante x $golsVisitante"
+                                            else
+                                                " x ",
+                                            color = corDestaque,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Black
+                                        )
+
+                                        Text(
+                                            nomeVisitante,
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        situacao,
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 "Tabela" -> {
@@ -781,49 +960,11 @@ fun TelaPrincipal(nome: String, time: String) {
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(15.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("#  CLUBE", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text("PTS", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-
-                    clubes.forEachIndexed { index, clube ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 3.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = corCartao
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    "${index + 1}.  $clube",
-                                    color = Color.White,
-                                    fontSize = 13.sp
-                                )
-                                Text(
-                                    "--",
-                                    color = corDestaque,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
 
                     Text(
-                        "Classificação aguardando conexão com dados reais.",
+                        "Aguardando integração da tabela oficial.",
                         color = Color.LightGray,
-                        fontSize = 12.sp
+                        modifier = Modifier.padding(top = 12.dp)
                     )
                 }
 
@@ -834,6 +975,7 @@ fun TelaPrincipal(nome: String, time: String) {
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
+
                     Spacer(modifier = Modifier.height(15.dp))
 
                     Card(
@@ -848,15 +990,19 @@ fun TelaPrincipal(nome: String, time: String) {
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold
                             )
+
                             Spacer(modifier = Modifier.height(10.dp))
+
                             Text(
                                 "Análise estatística em preparação.",
                                 color = Color.LightGray
                             )
+
                             Text(
                                 "Probabilidade de vitória, empate e derrota.",
                                 color = Color.LightGray
                             )
+
                             Text(
                                 "Previsão de placares.",
                                 color = Color.LightGray
