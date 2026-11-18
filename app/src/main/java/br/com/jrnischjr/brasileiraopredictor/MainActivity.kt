@@ -1043,11 +1043,34 @@ fun TelaPrincipal(nome: String, time: String) {
         corCartao = corCartao
     )
 }
+                
                 "Palpites" -> {
-    TelaPalpites(
-        corDestaque = corDestaque,
-        corCartao = corCartao
-    )
- }
-        
-               
+                    TelaPalpites(
+                        corDestaque = corDestaque,
+                        corCartao = corCartao
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(corCartao)
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            abas.forEach { aba ->
+                TextButton(onClick = { abaSelecionada = aba }) {
+                    Text(
+                        aba,
+                        color = if (abaSelecionada == aba)
+                            corDestaque else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+    }
+}
