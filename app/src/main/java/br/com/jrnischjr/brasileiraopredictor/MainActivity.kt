@@ -616,61 +616,189 @@ fun PredictorApp() {
 
 @Composable
 fun TelaPrincipal(nome: String, time: String) {
+    var abaSelecionada by remember { mutableStateOf("Início") }
+
+    val abas = listOf("Início", "Jogos", "Tabela", "Palpites")
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(Color(0xFF101820))
     ) {
-        Spacer(modifier = Modifier.height(30.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(18.dp)
+        ) {
+            Text(
+                "BRASILEIRÃO",
+                color = Color.White,
+                fontSize = 27.sp,
+                fontWeight = FontWeight.Black
+            )
 
-        Text(
-            "BRASILEIRÃO PREDICTOR",
-            color = Color.White,
-            fontSize = 25.sp,
-            fontWeight = FontWeight.Bold
-        )
+            Text(
+                "PREDICTOR 2026  •  BY NISCH",
+                color = Color(0xFFFFD54F),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
 
-        Spacer(modifier = Modifier.height(25.dp))
+            Spacer(modifier = Modifier.height(25.dp))
 
-        Text(
-            "Olá, $nome!",
-            color = Color.White,
-            fontSize = 23.sp,
-            fontWeight = FontWeight.Bold
-        )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF263746)
+                )
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        "Olá, $nome! 👋",
+                        color = Color.White,
+                        fontSize = 23.sp,
+                        fontWeight = FontWeight.Bold
+                    )
 
-        Text(
-            "Seu time do coração: $time",
-            color = Color.Black,
-            fontSize = 17.sp
-        )
+                    Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(35.dp))
+                    Text(
+                        "Seu time do coração",
+                        color = Color.LightGray,
+                        fontSize = 14.sp
+                    )
 
-        Text(
-            "CAMPEONATO BRASILEIRO 2026",
-            color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
+                    Text(
+                        "⚽ $time",
+                        color = Color(0xFFFFD54F),
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
 
-        Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(25.dp))
 
-        Text(
-            "PRÓXIMOS JOGOS",
-            color = Color.White,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold
-        )
+            Text(
+                "CENTRAL DO CAMPEONATO",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
 
-        Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        Text(
-            "Em breve: partidas, probabilidades e placares previstos!",
-            color = Color.Black,
-            fontSize = 15.sp
-        )
+            val secoes = listOf(
+                Triple("⚽", "JOGOS", "Partidas e confrontos"),
+                Triple("🏆", "CLASSIFICAÇÃO", "Tabela dos 20 clubes"),
+                Triple("🎯", "PALPITES", "Previsões inteligentes"),
+                Triple("📊", "ESTATÍSTICAS", "Números e desempenho")
+            )
+
+            secoes.forEach { secao ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 5.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF263746)
+                    ),
+                    onClick = {
+                        abaSelecionada = when (secao.second) {
+                            "JOGOS" -> "Jogos"
+                            "CLASSIFICAÇÃO" -> "Tabela"
+                            "PALPITES" -> "Palpites"
+                            else -> "Estatísticas"
+                        }
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(17.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            secao.first,
+                            fontSize = 30.sp
+                        )
+
+                        Spacer(modifier = Modifier.width(15.dp))
+
+                        Column {
+                            Text(
+                                secao.second,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                            Text(
+                                secao.third,
+                                color = Color.LightGray,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF263746)
+                )
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        "📅 RODADA DO BRASILEIRÃO",
+                        color = Color(0xFFFFD54F),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        "Área de partidas e resultados em preparação.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                "Inteligência • Estatística • Futebol",
+                color = Color.LightGray,
+                fontSize = 12.sp
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF263746))
+                .padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            abas.forEach { aba ->
+                TextButton(
+                    onClick = { abaSelecionada = aba }
+                ) {
+                    Text(
+                        aba,
+                        color = if (abaSelecionada == aba)
+                            Color(0xFFFFD54F)
+                        else
+                            Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
     }
 }
