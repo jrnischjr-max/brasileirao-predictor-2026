@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "225614080330",
+    "project_id": "brasileirao-predictor-2026",
+    "storage_bucket": "brasileirao-predictor-2026.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:225614080330:android:e8e7c59605d220d0a379b3",
+        "android_client_info": {
+          "package_name": "br.com.jrnischjr.brasileiraopredictor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6P2xDJlv4SNPP5m3WamRBglVa0koRPss"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
