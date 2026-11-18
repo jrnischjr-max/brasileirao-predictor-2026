@@ -1048,11 +1048,7 @@ fun TelaPrincipal(nome: String, time: String) {
         corDestaque = corDestaque,
         corCartao = corCartao
     )
-}
-                    }
                 }
-            }
-        }
 
         Row(
             modifier = Modifier
