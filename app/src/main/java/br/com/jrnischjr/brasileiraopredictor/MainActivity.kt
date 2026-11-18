@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -52,8 +51,11 @@ fun PredictorApp() {
     var menuAberto by remember { mutableStateOf(false) }
     var mensagem by remember { mutableStateOf("") }
     var carregando by remember { mutableStateOf(false) }
-    var usuarioLogado by remember { mutableStateOf(auth.currentUser != null) }
+    var usuarioLogado by remember {
+        mutableStateOf(auth.currentUser != null)
+    }
     var nomeUsuario by remember { mutableStateOf("") }
+
     val fundo = when (time) {
         "Flamengo" -> Color(0xFF8B0000)
         "Palmeiras" -> Color(0xFF006437)
@@ -68,231 +70,307 @@ fun PredictorApp() {
         else -> Color(0xFF063B2B)
     }
 
+    // Recupera o perfil quando o aplicativo é aberto
+    LaunchedEffect(auth.currentUser?.uid) {
+        val usuario = auth.currentUser
+
+        if (usuario != null) {
+            carregando = true
+
+            db.collection("users")
+                .document(usuario.uid)
+                .get()
+                .addOnSuccessListener { documento ->
+                    nomeUsuario = documento.getString("name")
+                        ?: usuario.email?.substringBefore("@")
+                        ?: "Torcedor"
+
+                    time = documento.getString("favoriteTeam") ?: ""
+                    usuarioLogado = true
+                    carregando = false
+                }
+                .addOnFailureListener {
+                    mensagem = "Não foi possível carregar seu perfil."
+                    usuarioLogado = false
+                    carregando = false
+                }
+        }
+    }
+
     MaterialTheme {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(fundo)
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(35.dp))
+        if (usuarioLogado) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(fundo)
+            ) {
+                TelaPrincipal(
+                    nome = nomeUsuario,
+                    time = time
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(fundo)
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(35.dp))
 
-            Text(
-                "BRASILEIRÃO",
-                color = Color.White,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold
-            )
+                Text(
+                    "BRASILEIRÃO",
+                    color = Color.White,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Text(
-                "PREDICTOR 2026",
-                color = Color(0xFFFFD54F),
-                fontSize = 23.sp,
-                fontWeight = FontWeight.Bold
-            )
+                Text(
+                    "PREDICTOR 2026",
+                    color = Color(0xFFFFD54F),
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Spacer(modifier = Modifier.height(25.dp))
+                Spacer(modifier = Modifier.height(25.dp))
 
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        if (cadastro) "CRIAR CONTA"
-                        else "ENTRAR",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            if (cadastro) "CRIAR CONTA" else "ENTRAR",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                    Spacer(modifier = Modifier.height(15.dp))
+                        Spacer(modifier = Modifier.height(15.dp))
 
-                    if (cadastro) {
+                        if (cadastro) {
+                            OutlinedTextField(
+                                value = nome,
+                                onValueChange = { nome = it },
+                                label = { Text("Seu nome") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+
                         OutlinedTextField(
-                            value = nome,
-                            onValueChange = { nome = it },
-                            label = { Text("Seu nome") },
+                            value = email,
+                            onValueChange = { email = it },
+                            label = { Text("E-mail") },
                             modifier = Modifier.fillMaxWidth()
                         )
 
                         Spacer(modifier = Modifier.height(10.dp))
-                    }
 
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("E-mail") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-    value = senha,
-    onValueChange = { senha = it },
-    label = { Text("Senha") },
-    modifier = Modifier.fillMaxWidth(),
-    visualTransformation = if (senhaVisivel)
-        androidx.compose.ui.text.input.VisualTransformation.None
-    else
-        androidx.compose.ui.text.input.PasswordVisualTransformation(),
-    trailingIcon = {
-        TextButton(
-            onClick = { senhaVisivel = !senhaVisivel }
-        ) {
-            Text(if (senhaVisivel) "Ocultar" else "Mostrar")
-        }
-    }
-)
-
-                    if (cadastro) {
-                        Spacer(modifier = Modifier.height(15.dp))
-
-                        Text(
-                            "ESCOLHA SEU TIME DO CORAÇÃO",
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Box {
-                            OutlinedButton(
-                                onClick = { menuAberto = true },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    if (time.isEmpty())
-                                        "Selecionar time"
-                                    else time
-                                )
-                            }
-
-                            DropdownMenu(
-                                expanded = menuAberto,
-                                onDismissRequest = {
-                                    menuAberto = false
-                                }
-                            ) {
-                                times.forEach { clube ->
-                                    DropdownMenuItem(
-                                        text = { Text(clube) },
-                                        onClick = {
-                                            time = clube
-                                            menuAberto = false
-                                        }
+                        OutlinedTextField(
+                            value = senha,
+                            onValueChange = { senha = it },
+                            label = { Text("Senha") },
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = if (senhaVisivel)
+                                androidx.compose.ui.text.input.VisualTransformation.None
+                            else
+                                androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            trailingIcon = {
+                                TextButton(
+                                    onClick = {
+                                        senhaVisivel = !senhaVisivel
+                                    }
+                                ) {
+                                    Text(
+                                        if (senhaVisivel) "Ocultar"
+                                        else "Mostrar"
                                     )
                                 }
                             }
-                        }
-                    }
+                        )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                        if (cadastro) {
+                            Spacer(modifier = Modifier.height(15.dp))
 
-                    Button(
-                        onClick = {
-                            if (email.isBlank() ||
-                                senha.isBlank() ||
-                                (cadastro && (nome.isBlank() || time.isBlank()))
-                            ) {
-                                mensagem = "Preencha todos os campos."
-                            } else {
-                                carregando = true
-                                mensagem = ""
+                            Text(
+                                "ESCOLHA SEU TIME DO CORAÇÃO",
+                                fontWeight = FontWeight.Bold
+                            )
 
-                                if (cadastro) {
-                                    auth.createUserWithEmailAndPassword(
-                                        email.trim(),
-                                        senha
-                                    ).addOnCompleteListener { tarefa ->
-                                        if (tarefa.isSuccessful) {
-                                            val usuario = auth.currentUser!!
+                            Box {
+                                OutlinedButton(
+                                    onClick = { menuAberto = true },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        if (time.isEmpty())
+                                            "Selecionar time"
+                                        else time
+                                    )
+                                }
 
-                                            val perfil = hashMapOf(
-                                                "name" to nome.trim(),
-                                                "email" to email.trim(),
-                                                "favoriteTeam" to time
-                                            )
-
-                                            db.collection("users")
-                                                .document(usuario.uid)
-                                                .set(perfil)
-                                                .addOnSuccessListener {
-                                                    mensagem = "Conta criada com sucesso!"
-                                                    carregando = false
-                                                }
-                                                .addOnFailureListener { erro ->
-                                                    mensagem = "Conta criada, mas houve erro ao salvar perfil: ${erro.message}"
-                                                    carregando = false
-                                                }
-                                        } else {
-                                            mensagem = tarefa.exception?.message
-                                                ?: "Erro ao criar conta."
-                                            carregando = false
-                                        }
+                                DropdownMenu(
+                                    expanded = menuAberto,
+                                    onDismissRequest = {
+                                        menuAberto = false
                                     }
-                                } else {
-                                    auth.signInWithEmailAndPassword(
-                                        email.trim(),
-                                        senha
-                                    ).addOnCompleteListener { tarefa ->
-                                        carregando = false
-                                        mensagem = if (tarefa.isSuccessful) {
-                                            "Login realizado com sucesso!"
-                                        } else {
-                                            tarefa.exception?.message
-                                                ?: "Erro ao entrar."
-                                        }
+                                ) {
+                                    times.forEach { clube ->
+                                        DropdownMenuItem(
+                                            text = { Text(clube) },
+                                            onClick = {
+                                                time = clube
+                                                menuAberto = false
+                                            }
+                                        )
                                     }
                                 }
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !carregando
-                    ) {
-                        Text(
-                            if (carregando) "AGUARDE..."
-                            else if (cadastro) "CRIAR MINHA CONTA"
-                            else "ENTRAR"
-                        )
-                    }
+                        }
 
-                    TextButton(
-                        onClick = {
-                            cadastro = !cadastro
-                            mensagem = ""
-                        },
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    ) {
-                        Text(
-                            if (cadastro)
-                                "Já tenho conta. Entrar"
-                            else
-                                "Não tenho conta. Cadastrar"
-                        )
-                    }
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                    if (mensagem.isNotEmpty()) {
-                        Text(
-                            mensagem,
-                            color = Color.DarkGray,
-                            modifier = Modifier.padding(top = 10.dp)
-                        )
+                        Button(
+                            onClick = {
+                                if (
+                                    email.isBlank() ||
+                                    senha.isBlank() ||
+                                    (cadastro && (
+                                        nome.isBlank() || time.isBlank()
+                                    ))
+                                ) {
+                                    mensagem = "Preencha todos os campos."
+                                } else {
+                                    carregando = true
+                                    mensagem = ""
+
+                                    if (cadastro) {
+                                        auth.createUserWithEmailAndPassword(
+                                            email.trim(),
+                                            senha
+                                        ).addOnCompleteListener { tarefa ->
+                                            if (tarefa.isSuccessful) {
+                                                val usuario = auth.currentUser!!
+
+                                                val perfil = hashMapOf(
+                                                    "name" to nome.trim(),
+                                                    "email" to email.trim(),
+                                                    "favoriteTeam" to time
+                                                )
+
+                                                db.collection("users")
+                                                    .document(usuario.uid)
+                                                    .set(perfil)
+                                                    .addOnSuccessListener {
+                                                        nomeUsuario = nome.trim()
+                                                        usuarioLogado = true
+                                                        mensagem = ""
+                                                        carregando = false
+                                                    }
+                                                    .addOnFailureListener { erro ->
+                                                        mensagem =
+                                                            "Erro ao salvar perfil: ${erro.message}"
+                                                        carregando = false
+                                                    }
+                                            } else {
+                                                mensagem =
+                                                    tarefa.exception?.message
+                                                        ?: "Erro ao criar conta."
+                                                carregando = false
+                                            }
+                                        }
+                                    } else {
+                                        auth.signInWithEmailAndPassword(
+                                            email.trim(),
+                                            senha
+                                        ).addOnCompleteListener { tarefa ->
+                                            if (tarefa.isSuccessful) {
+                                                val usuario = auth.currentUser!!
+
+                                                db.collection("users")
+                                                    .document(usuario.uid)
+                                                    .get()
+                                                    .addOnSuccessListener { documento ->
+                                                        nomeUsuario =
+                                                            documento.getString("name")
+                                                                ?: email.substringBefore("@")
+
+                                                        time =
+                                                            documento.getString("favoriteTeam")
+                                                                ?: ""
+
+                                                        usuarioLogado = true
+                                                        mensagem = ""
+                                                        carregando = false
+                                                    }
+                                                    .addOnFailureListener { erro ->
+                                                        mensagem =
+                                                            "Erro ao carregar perfil: ${erro.message}"
+                                                        carregando = false
+                                                    }
+                                            } else {
+                                                mensagem =
+                                                    tarefa.exception?.message
+                                                        ?: "Erro ao entrar."
+                                                carregando = false
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !carregando
+                        ) {
+                            Text(
+                                if (carregando) "AGUARDE..."
+                                else if (cadastro) "CRIAR MINHA CONTA"
+                                else "ENTRAR"
+                            )
+                        }
+
+                        TextButton(
+                            onClick = {
+                                cadastro = !cadastro
+                                mensagem = ""
+                            },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Text(
+                                if (cadastro)
+                                    "Já tenho conta. Entrar"
+                                else
+                                    "Não tenho conta. Cadastrar"
+                            )
+                        }
+
+                        if (mensagem.isNotEmpty()) {
+                            Text(
+                                mensagem,
+                                color = Color.DarkGray,
+                                modifier = Modifier.padding(top = 10.dp)
+                            )
+                        }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(25.dp))
+
+                Text(
+                    "ESTATÍSTICA • INTELIGÊNCIA • FUTEBOL",
+                    color = Color.White,
+                    fontSize = 11.sp
+                )
             }
-
-            Spacer(modifier = Modifier.height(25.dp))
-
-            Text(
-                "ESTATÍSTICA • INTELIGÊNCIA • FUTEBOL",
-                color = Color.White,
-                fontSize = 11.sp
-            )
         }
     }
 }
+
 @Composable
 fun TelaPrincipal(nome: String, time: String) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
