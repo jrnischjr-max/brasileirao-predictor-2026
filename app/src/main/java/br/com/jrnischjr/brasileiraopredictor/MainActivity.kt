@@ -288,3 +288,62 @@ fun PredictorApp() {
         }
     }
 }
+@Composable
+fun TelaPrincipal(nome: String, time: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(30.dp))
+
+        Text(
+            "BRASILEIRÃO PREDICTOR",
+            color = Color.White,
+            fontSize = 25.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(25.dp))
+
+        Text(
+            "Olá, $nome!",
+            color = Color.White,
+            fontSize = 23.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            "Seu time do coração: $time",
+            color = Color.White,
+            fontSize = 17.sp
+        )
+
+        Spacer(modifier = Modifier.height(35.dp))
+
+        Text(
+            "CAMPEONATO BRASILEIRO 2026",
+            color = Color(0xFFFFD54F),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            "PRÓXIMOS JOGOS",
+            color = Color.White,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            "Em breve: partidas, probabilidades e placares previstos!",
+            color = Color.White,
+            fontSize = 15.sp
+        )
+    }
+}
