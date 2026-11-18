@@ -1,4 +1,3 @@
-
 package br.com.jrnischjr.brasileiraopredictor
 
 import androidx.compose.foundation.layout.*
@@ -27,6 +26,9 @@ fun TelaPalpites(
     var erro by remember { mutableStateOf("") }
     var jogosProntos by remember { mutableStateOf(false) }
     var tabelaPronta by remember { mutableStateOf(false) }
+
+    var rodadaSelecionada by remember { mutableStateOf(0) }
+    var rodadaMenuAberto by remember { mutableStateOf(false) }
 
     fun atualizarHistorico() {
         val atualizados = HistoricoPalpites.atualizarResultados(
@@ -121,15 +123,34 @@ fun TelaPalpites(
         }
     }
 
-    val proximosJogos = jogos
-        .filter {
-            val situacao = it.optString("situacao").uppercase()
-            situacao != "FINISHED" &&
-            situacao != "FINALIZADO" &&
-            situacao != "AWARDED"
-        }
+    val jogosPendentes = jogos.filter {
+        val situacao = it.optString("situacao").uppercase()
+
+        situacao != "FINISHED" &&
+        situacao != "FINALIZADO" &&
+        situacao != "AWARDED"
+    }
+
+    val rodadasDisponiveis = jogos
+        .map { it.optInt("rodada") }
+        .filter { it > 0 }
+        .distinct()
+        .sorted()
+
+    val rodadaAtual = jogosPendentes
+        .minOfOrNull { it.optInt("rodada") }
+        ?: rodadasDisponiveis.firstOrNull()
+        ?: 0
+
+    val rodadaExibida = if (rodadaSelecionada in rodadasDisponiveis) {
+        rodadaSelecionada
+    } else {
+        rodadaAtual
+    }
+
+    val proximosJogos = jogosPendentes
+        .filter { it.optInt("rodada") == rodadaExibida }
         .sortedBy { it.optString("data") }
-        .take(5)
 
     val finalizados = historico.filter {
         it.optBoolean("finalizado")
@@ -157,7 +178,7 @@ fun TelaPalpites(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            "Previsões estatísticas dos próximos jogos",
+            "Previsões estatísticas da rodada selecionada",
             color = Color.LightGray,
             fontSize = 12.sp
         )
@@ -217,9 +238,44 @@ fun TelaPalpites(
 
         if (!carregando && erro.isEmpty() && jogosProntos && tabelaPronta) {
 
+            Text(
+                "ESCOLHA A RODADA",
+                color = corDestaque,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Box {
+                OutlinedButton(
+                    onClick = { rodadaMenuAberto = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("RODADA $rodadaExibida  ▼")
+                }
+
+                DropdownMenu(
+                    expanded = rodadaMenuAberto,
+                    onDismissRequest = { rodadaMenuAberto = false }
+                ) {
+                    rodadasDisponiveis.forEach { numeroRodada ->
+                        DropdownMenuItem(
+                            text = { Text("Rodada $numeroRodada") },
+                            onClick = {
+                                rodadaSelecionada = numeroRodada
+                                rodadaMenuAberto = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             if (proximosJogos.isEmpty()) {
                 Text(
-                    "Não há partidas futuras disponíveis no momento.",
+                    "Não há partidas pendentes nesta rodada.",
                     color = Color.White
                 )
             }
