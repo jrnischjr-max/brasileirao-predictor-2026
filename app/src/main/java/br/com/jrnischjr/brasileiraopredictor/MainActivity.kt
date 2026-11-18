@@ -1,5 +1,8 @@
+
+
 package br.com.jrnischjr.brasileiraopredictor
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,7 +15,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
@@ -31,6 +37,35 @@ class MainActivity : ComponentActivity() {
 fun PredictorApp() {
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
+    val context = LocalContext.current
+
+    val preferencias = remember {
+        context.getSharedPreferences(
+            "predictor_prefs",
+            Context.MODE_PRIVATE
+        )
+    }
+
+    val emailsSalvos = remember {
+        mutableStateListOf<String>().apply {
+            addAll(
+                preferencias.getStringSet(
+                    "emails_salvos",
+                    emptySet()
+                )?.toList() ?: emptyList()
+            )
+        }
+    }
+
+    val salvarEmail: (String) -> Unit = { novoEmail ->
+        val atualizados = (emailsSalvos + novoEmail).distinct()
+        preferencias.edit()
+            .putStringSet("emails_salvos", atualizados.toSet())
+            .apply()
+
+        emailsSalvos.clear()
+        emailsSalvos.addAll(atualizados)
+    }
 
     val times = listOf(
         "Flamengo", "Palmeiras", "Corinthians",
@@ -49,11 +84,14 @@ fun PredictorApp() {
     var time by remember { mutableStateOf("") }
     var cadastro by remember { mutableStateOf(true) }
     var menuAberto by remember { mutableStateOf(false) }
+    var menuEmailsAberto by remember { mutableStateOf(false) }
     var mensagem by remember { mutableStateOf("") }
     var carregando by remember { mutableStateOf(false) }
+
     var usuarioLogado by remember {
         mutableStateOf(auth.currentUser != null)
     }
+
     var nomeUsuario by remember { mutableStateOf("") }
 
     val fundo = when (time) {
@@ -70,7 +108,6 @@ fun PredictorApp() {
         else -> Color(0xFF063B2B)
     }
 
-    // Recupera o perfil quando o aplicativo é aberto
     LaunchedEffect(auth.currentUser?.uid) {
         val usuario = auth.currentUser
 
@@ -157,12 +194,42 @@ fun PredictorApp() {
                             Spacer(modifier = Modifier.height(10.dp))
                         }
 
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = { email = it },
-                            label = { Text("E-mail") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Box {
+                            OutlinedTextField(
+                                value = email,
+                                onValueChange = { email = it },
+                                label = { Text("E-mail") },
+                                modifier = Modifier.fillMaxWidth(),
+                                trailingIcon = {
+                                    if (emailsSalvos.isNotEmpty()) {
+                                        TextButton(
+                                            onClick = {
+                                                menuEmailsAberto = true
+                                            }
+                                        ) {
+                                            Text("▼")
+                                        }
+                                    }
+                                }
+                            )
+
+                            DropdownMenu(
+                                expanded = menuEmailsAberto,
+                                onDismissRequest = {
+                                    menuEmailsAberto = false
+                                }
+                            ) {
+                                emailsSalvos.forEach { emailSalvo ->
+                                    DropdownMenuItem(
+                                        text = { Text(emailSalvo) },
+                                        onClick = {
+                                            email = emailSalvo
+                                            menuEmailsAberto = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(10.dp))
 
@@ -172,9 +239,9 @@ fun PredictorApp() {
                             label = { Text("Senha") },
                             modifier = Modifier.fillMaxWidth(),
                             visualTransformation = if (senhaVisivel)
-                                androidx.compose.ui.text.input.VisualTransformation.None
+                                VisualTransformation.None
                             else
-                                androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                PasswordVisualTransformation(),
                             trailingIcon = {
                                 TextButton(
                                     onClick = {
@@ -262,6 +329,7 @@ fun PredictorApp() {
                                                     .document(usuario.uid)
                                                     .set(perfil)
                                                     .addOnSuccessListener {
+                                                        salvarEmail(email.trim())
                                                         nomeUsuario = nome.trim()
                                                         usuarioLogado = true
                                                         mensagem = ""
@@ -285,6 +353,7 @@ fun PredictorApp() {
                                             senha
                                         ).addOnCompleteListener { tarefa ->
                                             if (tarefa.isSuccessful) {
+                                                salvarEmail(email.trim())
                                                 val usuario = auth.currentUser!!
 
                                                 db.collection("users")
@@ -394,7 +463,7 @@ fun TelaPrincipal(nome: String, time: String) {
 
         Text(
             "Seu time do coração: $time",
-            color = Color.black,
+            color = Color.Black,
             fontSize = 17.sp
         )
 
@@ -420,7 +489,7 @@ fun TelaPrincipal(nome: String, time: String) {
 
         Text(
             "Em breve: partidas, probabilidades e placares previstos!",
-            color = Color.black,
+            color = Color.Black,
             fontSize = 15.sp
         )
     }
