@@ -183,7 +183,7 @@ fun TelaTabela(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "$posicaoº",
+                                "${posicao}º",
                                 color = corDestaque,
                                 fontWeight = FontWeight.Black,
                                 fontSize = 15.sp,
