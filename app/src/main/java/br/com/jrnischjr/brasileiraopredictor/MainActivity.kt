@@ -720,11 +720,11 @@ fun TelaPrincipal(nome: String, time: String) {
                         situacao != "AWARDED"
                     }
 
-                    rodadaSelecionada =
-                        proximoJogo?.optString("rodada")?.toIntOrNull()
-                            ?: jogos.firstOrNull()
-                                ?.optString("rodada")
-                                ?.toIntOrNull()
+                    if (rodadaSelecionada == null) {
+    rodadaSelecionada =
+        proximoJogo?.optString("rodada")?.toIntOrNull()
+            ?: jogos.firstOrNull()?.optString("rodada")?.toIntOrNull()
+}
                 }
             } else {
                 erroJogos = erro ?: "Não foi possível carregar os jogos."
