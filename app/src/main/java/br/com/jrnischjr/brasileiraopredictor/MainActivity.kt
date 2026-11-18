@@ -394,7 +394,7 @@ fun TelaPrincipal(nome: String, time: String) {
 
         Text(
             "Seu time do coração: $time",
-            color = Color.White,
+            color = Color.black,
             fontSize = 17.sp
         )
 
@@ -420,7 +420,7 @@ fun TelaPrincipal(nome: String, time: String) {
 
         Text(
             "Em breve: partidas, probabilidades e placares previstos!",
-            color = Color.White,
+            color = Color.black,
             fontSize = 15.sp
         )
     }
