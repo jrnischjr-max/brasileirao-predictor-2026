@@ -1,19 +1,15 @@
+
 package br.com.jrnischjr.brasileiraopredictor
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONObject
-import kotlin.math.exp
-import kotlin.math.roundToInt
 
 @Composable
 fun TelaPalpites(
@@ -80,14 +76,6 @@ fun TelaPalpites(
                 erro = "Não há dados suficientes para gerar os palpites."
             }
         }
-    }
-
-    fun probabilidadePoisson(gols: Double, quantidade: Int): Double {
-        var resultado = exp(-gols)
-        for (i in 1..quantidade) {
-            resultado *= gols / i
-        }
-        return resultado
     }
 
     fun formatarData(data: String): String {
@@ -157,7 +145,7 @@ fun TelaPalpites(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    "Analisamos gols marcados e sofridos, desempenho na tabela e mando de campo para estimar as probabilidades.",
+                    "O motor analisa os últimos cinco jogos, o desempenho em casa e fora, gols marcados e sofridos e a força dos adversários. Um modelo estatístico de Poisson calcula as probabilidades.",
                     color = Color.White,
                     fontSize = 12.sp
                 )
@@ -208,145 +196,122 @@ fun TelaPalpites(
                 val visitante = jogo.optJSONObject("visitante")
                     ?.optString("nome", "") ?: ""
 
-                val timeCasa = clubes.firstOrNull {
-                    it.optString("nome").equals(mandante, true)
-                }
+                val analise = MotorPalpites.analisar(
+                    jogo = jogo,
+                    todosJogos = jogos.toList(),
+                    clubes = clubes.toList()
+                )
 
-                val timeFora = clubes.firstOrNull {
-                    it.optString("nome").equals(visitante, true)
-                }
-
-                if (timeCasa != null && timeFora != null) {
-                    val jogosCasa = timeCasa.optInt("jogos")
-                    val jogosFora = timeFora.optInt("jogos")
-
-                    if (jogosCasa > 0 && jogosFora > 0) {
-                        val golsCasa = timeCasa.optDouble("golsPro") / jogosCasa
-                        val sofridosCasa = timeCasa.optDouble("golsContra") / jogosCasa
-                        val golsFora = timeFora.optDouble("golsPro") / jogosFora
-                        val sofridosFora = timeFora.optDouble("golsContra") / jogosFora
-
-                        val esperadoCasa = (
-                            (golsCasa + sofridosFora) / 2.0 * 1.12
-                        ).coerceIn(0.15, 3.5)
-
-                        val esperadoFora = (
-                            (golsFora + sofridosCasa) / 2.0 * 0.90
-                        ).coerceIn(0.15, 3.5)
-
-                        var vitoriaCasa = 0.0
-                        var empate = 0.0
-                        var vitoriaFora = 0.0
-
-                        for (gCasa in 0..6) {
-                            for (gFora in 0..6) {
-                                val chance =
-                                    probabilidadePoisson(esperadoCasa, gCasa) *
-                                    probabilidadePoisson(esperadoFora, gFora)
-
-                                when {
-                                    gCasa > gFora -> vitoriaCasa += chance
-                                    gCasa == gFora -> empate += chance
-                                    else -> vitoriaFora += chance
-                                }
-                            }
-                        }
-
-                        val total = vitoriaCasa + empate + vitoriaFora
-
-                        val pCasa = (vitoriaCasa / total * 100).roundToInt()
-                        val pEmpate = (empate / total * 100).roundToInt()
-                        val pFora = 100 - pCasa - pEmpate
-
-                        val placarCasa = esperadoCasa.roundToInt()
-                        val placarFora = esperadoFora.roundToInt()
-
-                        Card(
+                if (analise != null) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = corCartao
+                        )
+                    ) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = corCartao
-                            )
+                                .padding(14.dp)
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp)
+                            Text(
+                                "RODADA ${jogo.optString("rodada")}",
+                                color = corDestaque,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+
+                            Text(
+                                formatarData(jogo.optString("data")),
+                                color = Color.LightGray,
+                                fontSize = 11.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                mandante,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+
+                            Text(
+                                "Forma recente: ${analise.formaCasa}",
+                                color = corDestaque,
+                                fontSize = 11.sp
+                            )
+
+                            Text(
+                                "              x",
+                                color = corDestaque,
+                                fontWeight = FontWeight.Black
+                            )
+
+                            Text(
+                                visitante,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+
+                            Text(
+                                "Forma recente: ${analise.formaFora}",
+                                color = corDestaque,
+                                fontSize = 11.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                "PROBABILIDADES ESTIMADAS",
+                                color = corDestaque,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Casa", color = Color.White, fontSize = 12.sp)
+                                Text("Empate", color = Color.White, fontSize = 12.sp)
+                                Text("Fora", color = Color.White, fontSize = 12.sp)
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    "RODADA ${jogo.optString("rodada")}",
+                                    "${analise.probCasa}%",
                                     color = corDestaque,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
+                                    fontWeight = FontWeight.Bold
                                 )
-
                                 Text(
-                                    formatarData(jogo.optString("data")),
-                                    color = Color.LightGray,
-                                    fontSize = 11.sp
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Text(
-                                    mandante,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-
-                                Text(
-                                    "              x",
+                                    "${analise.probEmpate}%",
                                     color = corDestaque,
-                                    fontWeight = FontWeight.Black
+                                    fontWeight = FontWeight.Bold
                                 )
-
                                 Text(
-                                    visitante,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Text(
-                                    "PROBABILIDADES ESTIMADAS",
+                                    "${analise.probFora}%",
                                     color = corDestaque,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Casa", color = Color.White, fontSize = 12.sp)
-                                    Text("Empate", color = Color.White, fontSize = 12.sp)
-                                    Text("Fora", color = Color.White, fontSize = 12.sp)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("$pCasa%", color = corDestaque, fontWeight = FontWeight.Bold)
-                                    Text("$pEmpate%", color = corDestaque, fontWeight = FontWeight.Bold)
-                                    Text("$pFora%", color = corDestaque, fontWeight = FontWeight.Bold)
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Text(
-                                    "🎯 PLACAR ESTIMADO: $placarCasa x $placarFora",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 15.sp
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                "🎯 PLACAR ESTIMADO: ${analise.placarCasa} x ${analise.placarFora}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 15.sp
+                            )
                         }
                     }
                 }
