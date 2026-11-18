@@ -1044,45 +1044,11 @@ fun TelaPrincipal(nome: String, time: String) {
     )
 }
                 "Palpites" -> {
-                    Text(
-                        "🎯 PALPITES INTELIGENTES",
-                        color = corDestaque,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(15.dp))
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = corCartao
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Text(
-                                "PREVISÕES DO CAMPEONATO",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Text(
-                                "Análise estatística em preparação.",
-                                color = Color.LightGray
-                            )
-
-                            Text(
-                                "Probabilidade de vitória, empate e derrota.",
-                                color = Color.LightGray
-                            )
-
-                            Text(
-                                "Previsão de placares.",
-                                color = Color.LightGray
-                            )
-                        }
+    TelaPalpites(
+        corDestaque = corDestaque,
+        corCartao = corCartao
+    )
+}
                     }
                 }
             }
