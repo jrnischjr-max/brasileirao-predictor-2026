@@ -742,15 +742,20 @@ fun TelaPrincipal(nome: String, time: String) {
     }
 
     LaunchedEffect(abaSelecionada) {
-        if (
-            abaSelecionada == "Jogos" &&
-            jogos.isEmpty() &&
-            !carregandoJogos
-        ) {
+    if (abaSelecionada == "Jogos") {
+
+        if (jogos.isEmpty() && !carregandoJogos) {
             carregarJogos()
         }
-    }
 
+        while (true) {
+            delay(60_000)
+            if (!carregandoJogos) {
+                carregarJogos()
+            }
+        }
+    }
+}
     Column(
     modifier = Modifier
         .fillMaxSize()
