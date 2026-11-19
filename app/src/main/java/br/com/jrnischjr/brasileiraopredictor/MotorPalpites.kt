@@ -406,7 +406,7 @@ object MotorPalpites {
             sqrt(fatorAtaqueCasa * fatorDefesaFora) *
             formaFatorCasa *
             fatorConfronto *
-            1.08
+            1.0
         ).coerceIn(0.15, 3.8)
 
         val esperadoFora = (
@@ -414,7 +414,7 @@ object MotorPalpites {
             sqrt(fatorAtaqueFora * fatorDefesaCasa) *
             formaFatorFora *
             (2.0 - fatorConfronto) *
-            0.94
+            1.0
         ).coerceIn(0.15, 3.8)
 
         var vitoriaCasa = 0.0
