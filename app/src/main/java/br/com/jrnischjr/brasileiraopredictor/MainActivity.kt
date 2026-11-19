@@ -53,6 +53,18 @@ fun PredictorApp() {
     var usuarioLogado by remember { mutableStateOf(auth.currentUser != null) }
     var biometriaLiberada by remember { mutableStateOf(false) }
 
+    val notificacoesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { }
+
+    LaunchedEffect(usuarioLogado, biometriaLiberada) {
+        if (usuarioLogado && biometriaLiberada && Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notificacoesLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { resultado ->
