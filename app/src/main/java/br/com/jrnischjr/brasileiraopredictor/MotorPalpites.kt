@@ -177,6 +177,43 @@ object MotorPalpites {
         return fator to forma
     }
 
+    private fun fatorConfrontoDireto(
+        nomeCasa: String,
+        nomeFora: String,
+        partidas: List<Partida>
+    ): Double {
+        val confrontos = partidas.filter { partida ->
+            (partida.casa.equals(nomeCasa, true) &&
+                partida.fora.equals(nomeFora, true)) ||
+            (partida.casa.equals(nomeFora, true) &&
+                partida.fora.equals(nomeCasa, true))
+        }.takeLast(5)
+
+        if (confrontos.isEmpty()) return 1.0
+
+        var saldoPonderado = 0.0
+        var pesoTotal = 0.0
+
+        confrontos.forEachIndexed { indice, partida ->
+            val peso = (indice + 1).toDouble()
+            val casaEraMandante = partida.casa.equals(nomeCasa, true)
+            val golsTimeCasa = if (casaEraMandante) partida.golsCasa else partida.golsFora
+            val golsTimeFora = if (casaEraMandante) partida.golsFora else partida.golsCasa
+
+            val resultado = when {
+                golsTimeCasa > golsTimeFora -> 1.0
+                golsTimeCasa < golsTimeFora -> -1.0
+                else -> 0.0
+            }
+
+            saldoPonderado += resultado * peso
+            pesoTotal += peso
+        }
+
+        val equilibrio = if (pesoTotal > 0.0) saldoPonderado / pesoTotal else 0.0
+        return (1.0 + equilibrio * 0.035).coerceIn(0.965, 1.035)
+    }
+
     private fun media(
         valores: List<Double>,
         padrao: Double
@@ -240,31 +277,56 @@ object MotorPalpites {
         ): Double {
             if (lista.isEmpty()) return 0.0
 
-            return lista.sumOf {
-                when {
-                    it.casa.equals(nome, true) ->
-                        if (feitos) it.golsCasa else it.golsFora
+            val recentes = lista.takeLast(8)
+            var somaPonderada = 0.0
+            var pesoTotal = 0.0
+
+            recentes.forEachIndexed { indice, partida ->
+                val gols = when {
+                    partida.casa.equals(nome, true) ->
+                        if (feitos) partida.golsCasa else partida.golsFora
                     else ->
-                        if (feitos) it.golsFora else it.golsCasa
+                        if (feitos) partida.golsFora else partida.golsCasa
                 }
-            }.toDouble() / lista.size
+                val peso = (indice + 1).toDouble()
+                somaPonderada += gols * peso
+                pesoTotal += peso
+            }
+
+            return if (pesoTotal > 0.0) somaPonderada / pesoTotal else 0.0
         }
 
-        val ataqueCasa = if (jogosCasa.isNotEmpty())
+        // Amostras pequenas recebem ajuste em direção à média da liga.
+        // Isso evita que um ou dois jogos distorçam a previsão.
+        fun ajustarPelaAmostra(
+            observado: Double,
+            referencia: Double,
+            quantidade: Int
+        ): Double {
+            val confiabilidade = quantidade.toDouble() / (quantidade + 4.0)
+            return referencia + (observado - referencia) * confiabilidade
+        }
+
+        val ataqueCasaBruto = if (jogosCasa.isNotEmpty())
             golsPorJogo(jogosCasa, nomeCasa, true)
         else mediaLigaCasa
 
-        val defesaCasa = if (jogosCasa.isNotEmpty())
+        val defesaCasaBruta = if (jogosCasa.isNotEmpty())
             golsPorJogo(jogosCasa, nomeCasa, false)
         else mediaLigaFora
 
-        val ataqueFora = if (jogosFora.isNotEmpty())
+        val ataqueForaBruto = if (jogosFora.isNotEmpty())
             golsPorJogo(jogosFora, nomeFora, true)
         else mediaLigaFora
 
-        val defesaFora = if (jogosFora.isNotEmpty())
+        val defesaForaBruta = if (jogosFora.isNotEmpty())
             golsPorJogo(jogosFora, nomeFora, false)
         else mediaLigaCasa
+
+        val ataqueCasa = ajustarPelaAmostra(ataqueCasaBruto, mediaLigaCasa, jogosCasa.size)
+        val defesaCasa = ajustarPelaAmostra(defesaCasaBruta, mediaLigaFora, jogosCasa.size)
+        val ataqueFora = ajustarPelaAmostra(ataqueForaBruto, mediaLigaFora, jogosFora.size)
+        val defesaFora = ajustarPelaAmostra(defesaForaBruta, mediaLigaCasa, jogosFora.size)
 
         val fatorAtaqueCasa =
             (ataqueCasa / mediaLigaCasa).coerceIn(0.35, 2.5)
@@ -284,10 +346,17 @@ object MotorPalpites {
         val (formaFatorFora, formaFora) =
             formaRecente(nomeFora, partidas, clubes)
 
+        val fatorConfronto = fatorConfrontoDireto(
+            nomeCasa,
+            nomeFora,
+            partidas
+        )
+
         val esperadoCasa = (
             mediaLigaCasa *
             sqrt(fatorAtaqueCasa * fatorDefesaFora) *
             formaFatorCasa *
+            fatorConfronto *
             1.08
         ).coerceIn(0.15, 3.8)
 
@@ -295,6 +364,7 @@ object MotorPalpites {
             mediaLigaFora *
             sqrt(fatorAtaqueFora * fatorDefesaCasa) *
             formaFatorFora *
+            (2.0 - fatorConfronto) *
             0.94
         ).coerceIn(0.15, 3.8)
 
