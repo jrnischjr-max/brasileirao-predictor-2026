@@ -3,6 +3,9 @@ package br.com.jrnischjr.brasileiraopredictor
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 object HistoricoPalpitesNuvem {
 
@@ -97,6 +100,82 @@ object HistoricoPalpitesNuvem {
             }
             .addOnFailureListener { erro ->
                 callback(false, erro.message ?: "Erro ao verificar palpite.")
+            }
+    }
+
+    fun salvarPalpiteUsuario(
+        uid: String,
+        jogo: JSONObject,
+        golsCasa: Int,
+        golsFora: Int,
+        callback: (Boolean, String?) -> Unit
+    ) {
+        if (uid.isBlank()) {
+            callback(false, "Faça login para salvar seu palpite.")
+            return
+        }
+        if (golsCasa !in 0..20 || golsFora !in 0..20) {
+            callback(false, "Informe gols entre 0 e 20 para cada time.")
+            return
+        }
+
+        val dataJogo = jogo.optString("data")
+        val inicio = try {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+                isLenient = false
+            }.parse(dataJogo.take(19))?.time
+        } catch (_: Exception) {
+            null
+        }
+        if (inicio == null) {
+            callback(false, "Não foi possível confirmar o horário da partida.")
+            return
+        }
+        if (System.currentTimeMillis() >= inicio) {
+            callback(false, "Palpites bloqueados: a partida já começou.")
+            return
+        }
+
+        val mandante = jogo.optJSONObject("mandante")?.optString("nome", "").orEmpty()
+        val visitante = jogo.optJSONObject("visitante")?.optString("nome", "").orEmpty()
+        val idJogo = jogo.optString("id").ifBlank {
+            "${jogo.optString("rodada")}_${dataJogo}_${mandante}_${visitante}"
+        }
+        val documento = colecao(uid).document(idJogo)
+        documento.get()
+            .addOnSuccessListener { existente ->
+                if (existente.getBoolean("finalizado") == true ||
+                    System.currentTimeMillis() >= inicio
+                ) {
+                    callback(false, "Palpites bloqueados: a partida já começou ou foi finalizada.")
+                    return@addOnSuccessListener
+                }
+                val registro = hashMapOf<String, Any>(
+                    "idJogo" to idJogo,
+                    "rodada" to jogo.optString("rodada"),
+                    "data" to dataJogo,
+                    "mandante" to mandante,
+                    "visitante" to visitante,
+                    "usuarioPlacarCasa" to golsCasa,
+                    "usuarioPlacarFora" to golsFora,
+                    "usuarioResultadoPrevisto" to when {
+                        golsCasa > golsFora -> "CASA"
+                        golsCasa < golsFora -> "FORA"
+                        else -> "EMPATE"
+                    },
+                    "usuarioAtualizadoEm" to System.currentTimeMillis(),
+                    "finalizado" to false,
+                    "origem" to (existente.getString("origem") ?: "PALPITE_USUARIO")
+                )
+                documento.set(registro, SetOptions.merge())
+                    .addOnSuccessListener { callback(true, null) }
+                    .addOnFailureListener { erro ->
+                        callback(false, erro.message ?: "Erro ao salvar seu palpite.")
+                    }
+            }
+            .addOnFailureListener { erro ->
+                callback(false, erro.message ?: "Erro ao verificar a partida.")
             }
     }
 
@@ -267,6 +346,8 @@ object HistoricoPalpitesNuvem {
                         val resultadoAnterior = palpite.optString("resultadoReal")
                         val acertouResultadoAnterior = palpite.optBoolean("acertouResultado")
                         val acertouPlacarAnterior = palpite.optBoolean("acertouPlacar")
+                        val usuarioAcertouResultadoAnterior = palpite.optBoolean("usuarioAcertouResultado")
+                        val usuarioAcertouPlacarAnterior = palpite.optBoolean("usuarioAcertouPlacar")
                         val tinhaMetricas = palpite.has("resultadoReal") &&
                             palpite.has("acertouResultado") &&
                             palpite.has("acertouPlacar")
@@ -277,7 +358,9 @@ object HistoricoPalpitesNuvem {
                             !tinhaMetricas ||
                             resultadoAnterior != palpite.optString("resultadoReal") ||
                             acertouResultadoAnterior != palpite.optBoolean("acertouResultado") ||
-                            acertouPlacarAnterior != palpite.optBoolean("acertouPlacar")
+                            acertouPlacarAnterior != palpite.optBoolean("acertouPlacar") ||
+                            usuarioAcertouResultadoAnterior != palpite.optBoolean("usuarioAcertouResultado") ||
+                            usuarioAcertouPlacarAnterior != palpite.optBoolean("usuarioAcertouPlacar")
 
                         if (precisaSalvar) {
                             lote.set(
@@ -352,6 +435,22 @@ object HistoricoPalpitesNuvem {
             "acertouPlacar",
             previstoCasa == golsCasa && previstoFora == golsFora
         )
+
+        if (palpite.has("usuarioPlacarCasa") && palpite.has("usuarioPlacarFora")) {
+            val usuarioCasa = palpite.optInt("usuarioPlacarCasa", -1)
+            val usuarioFora = palpite.optInt("usuarioPlacarFora", -1)
+            if (usuarioCasa >= 0 && usuarioFora >= 0) {
+                val resultadoUsuario = when {
+                    usuarioCasa > usuarioFora -> "CASA"
+                    usuarioCasa < usuarioFora -> "FORA"
+                    else -> "EMPATE"
+                }
+                palpite.put("usuarioResultadoPrevisto", resultadoUsuario)
+                palpite.put("usuarioResultadoReal", resultadoReal)
+                palpite.put("usuarioAcertouResultado", resultadoUsuario == resultadoReal)
+                palpite.put("usuarioAcertouPlacar", usuarioCasa == golsCasa && usuarioFora == golsFora)
+            }
+        }
     }
 
     private fun JSONObject.toMap(): Map<String, Any> {
