@@ -226,6 +226,22 @@ fun TelaPalpites(
     val simuladosCasa = simulados.filter { resultadoPrevisto(it) == "CASA" }
     val simuladosEmpate = simulados.filter { resultadoPrevisto(it) == "EMPATE" }
     val simuladosFora = simulados.filter { resultadoPrevisto(it) == "FORA" }
+
+    // Raio-X específico para entender por que o empate não é escolhido.
+    val probabilidadesEmpate = simulados.map {
+        probabilidade(it, "probEmpateExata", "probEmpate")
+    }.filter { it.isFinite() }
+    val mediaProbEmpate = probabilidadesEmpate.average().takeIf { it.isFinite() } ?: 0.0
+    val maiorProbEmpate = probabilidadesEmpate.maxOrNull() ?: 0.0
+    val empatesAteCincoPontos = simulados.count { palpite ->
+        val empate = probabilidade(palpite, "probEmpateExata", "probEmpate")
+        val maiorAdversaria = maxOf(
+            probabilidade(palpite, "probCasaExata", "probCasa"),
+            probabilidade(palpite, "probForaExata", "probFora")
+        )
+        empate.isFinite() && maiorAdversaria.isFinite() &&
+            maiorAdversaria >= empate && maiorAdversaria - empate <= 5.0
+    }
     val simuladosAltaConf = simulados.filter {
         maxOf(
             probabilidade(it, "probCasaExata", "probCasa"),
@@ -761,6 +777,47 @@ Row(
                 Text("Abaixo de 40%: ${taxaDoGrupo(simuladosBaixaConf)}", color = Color.White, fontSize = 12.sp)
                 Text(
                     "Esses recortes mostram onde o motor acerta e erra. Grupos pequenos ainda não permitem conclusões firmes.",
+                    color = Color.LightGray,
+                    fontSize = 10.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = corCartao)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text("RAIO-X DOS EMPATES", color = corDestaque, fontWeight = FontWeight.Bold)
+                Text(
+                    "Partidas analisadas: ${probabilidadesEmpate.size} de ${simulados.size}",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Empates escolhidos pelo motor: ${simuladosEmpate.size}",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Probabilidade média de empate: ${"%.1f".format(java.util.Locale.US, mediaProbEmpate)}%",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Maior probabilidade de empate: ${"%.1f".format(java.util.Locale.US, maiorProbEmpate)}%",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Empate ficou até 5 pontos do favorito: $empatesAteCincoPontos",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Se a média for razoável, mas o empate quase nunca liderar, vamos investigar o equilíbrio entre as probabilidades. Nenhum resultado será forçado artificialmente.",
                     color = Color.LightGray,
                     fontSize = 10.sp
                 )
