@@ -16,7 +16,9 @@ data class AnalisePalpite(
     val formaFora: String,
     val probCasaExata: Double,
     val probEmpateExata: Double,
-    val probForaExata: Double
+    val probForaExata: Double,
+    val golsEsperadosCasa: Double,
+    val golsEsperadosFora: Double
 )
 
 object MotorPalpites {
@@ -462,7 +464,9 @@ object MotorPalpites {
             formaFora = formaFora,
             probCasaExata = probCasaExata,
             probEmpateExata = probEmpateExata,
-            probForaExata = probForaExata
+            probForaExata = probForaExata,
+            golsEsperadosCasa = esperadoCasa,
+            golsEsperadosFora = esperadoFora
         )
     }
 }
