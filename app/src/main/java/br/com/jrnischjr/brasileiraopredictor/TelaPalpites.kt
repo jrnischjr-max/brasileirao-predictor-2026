@@ -6,6 +6,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -18,6 +20,7 @@ fun TelaPalpites(
     corCartao: Color,
     uid: String
 ) {
+    val clipboardManager = LocalClipboardManager.current
     val jogos = remember { mutableStateListOf<JSONObject>() }
     val clubes = remember { mutableStateListOf<JSONObject>() }
     val historico = remember { mutableStateListOf<JSONObject>() }
@@ -463,6 +466,59 @@ fun TelaPalpites(
         (acertosPlacar * 100) / finalizados.size
     } else {
         0
+    }
+
+    val relatorioDiagnostico = buildString {
+        appendLine("DIAGNÓSTICO DOS ERROS")
+        appendLine("Acerto por resultado previsto")
+        appendLine("Vitória da casa: ${taxaDoGrupo(simuladosCasa)}")
+        appendLine("Empate: ${taxaDoGrupo(simuladosEmpate)}")
+        appendLine("Vitória de fora: ${taxaDoGrupo(simuladosFora)}")
+        appendLine("DISTRIBUIÇÃO DOS RESULTADOS REAIS")
+        appendLine("Vitórias da casa: ${simuladosCasaReal.size} • Empates: ${simuladosEmpateReal.size} • Vitórias de fora: ${simuladosForaReal.size}")
+        appendLine("Probabilidade média dada à casa quando ela venceu: ${"%.1f".format(java.util.Locale.US, mediaProbCasaEmVitoriasCasa)}%")
+        appendLine("Probabilidade média de empate nos empates reais: ${"%.1f".format(java.util.Locale.US, mediaProbEmpateEmEmpates)}%")
+        appendLine("Probabilidade média dada ao visitante quando ele venceu: ${"%.1f".format(java.util.Locale.US, mediaProbForaEmVitoriasFora)}%")
+        appendLine("Acerto por confiança máxima")
+        appendLine("50% ou mais: ${taxaDoGrupo(simuladosAltaConf)}")
+        appendLine("40% a 49%: ${taxaDoGrupo(simuladosMediaConf)}")
+        appendLine("Abaixo de 40%: ${taxaDoGrupo(simuladosBaixaConf)}")
+        appendLine("TESTE PARALELO: DIXON-COLES")
+        candidatosDixonColes.forEach { teste ->
+            appendLine("ρ ${"%.2f".format(java.util.Locale.US, teste.first)}: ${if (teste.second > 0) teste.third.first * 100 / teste.second else 0}% de acerto (${teste.third.first}/${teste.second}) • empates previstos: ${teste.third.second} • empates certos: ${teste.third.third}")
+        }
+        appendLine("VALIDAÇÃO TEMPORAL (70% TREINO / 30% TESTE)")
+        appendLine("Ajuste escolhido: ρ ${"%.2f".format(java.util.Locale.US, rhoEscolhido)}")
+        appendLine("Treino: ${treinoDixon.size} jogos • Teste futuro: ${testeDixon.size} jogos")
+        appendLine("Modelo original no teste: ${resultadoBaseTeste.first}/${resultadoBaseTeste.second}")
+        appendLine("Modelo experimental no teste: ${resultadoAjustadoTeste.first}/${resultadoAjustadoTeste.second}")
+        appendLine("LABORATÓRIO: VANTAGEM DO MANDANTE")
+        fatoresMandante.forEach { fator ->
+            val resultado = avaliarFatorMandante(treinoDixon, fator)
+            appendLine("Fator ${"%.2f".format(java.util.Locale.US, fator)}: ${resultado.first}/${treinoDixon.size} acertos • empates: ${resultado.second} • vitórias fora: ${resultado.third}")
+        }
+        appendLine("Melhor fator no treino: ${"%.2f".format(java.util.Locale.US, fatorMandanteEscolhido)}")
+        appendLine("Teste futuro, modelo atual: ${resultadoMandoBaseTeste.first}/${testeDixon.size} • empates: ${resultadoMandoBaseTeste.second} • fora: ${resultadoMandoBaseTeste.third}")
+        appendLine("Teste futuro, fator ajustado: ${resultadoMandoAjustadoTeste.first}/${testeDixon.size} • empates: ${resultadoMandoAjustadoTeste.second} • fora: ${resultadoMandoAjustadoTeste.third}")
+        appendLine("LABORATÓRIO: DECISÃO DE EMPATE")
+        limiaresEmpate.forEach { limiar ->
+            val resultado = avaliarLimiarEmpate(treinoDixon, limiar)
+            appendLine("Limiar ${"%.2f".format(java.util.Locale.US, limiar)}: ${resultado.first}/${treinoDixon.size} acertos • empates: ${resultado.second} • certos: ${resultado.third}")
+        }
+        appendLine("Melhor limiar no treino: ${"%.2f".format(java.util.Locale.US, limiarEmpateEscolhido)}")
+        appendLine("Treino, modelo atual: ${resultadoEmpateBaseTreino.first}/${treinoDixon.size} • ajustado: ${resultadoEmpateAjustadoTreino.first}/${treinoDixon.size}")
+        appendLine("Teste futuro, modelo atual: ${resultadoEmpateBaseTeste.first}/${testeDixon.size} • empates: ${resultadoEmpateBaseTeste.second} • certos: ${resultadoEmpateBaseTeste.third}")
+        appendLine("Teste futuro, limiar ajustado: ${resultadoEmpateAjustadoTeste.first}/${testeDixon.size} • empates: ${resultadoEmpateAjustadoTeste.second} • certos: ${resultadoEmpateAjustadoTeste.third}")
+        appendLine("RAIO-X DOS EMPATES")
+        appendLine("Partidas analisadas: ${probabilidadesEmpate.size} de ${simulados.size}")
+        appendLine("Empates escolhidos pelo motor: ${simuladosEmpate.size}")
+        appendLine("Probabilidade média de empate: ${"%.1f".format(java.util.Locale.US, mediaProbEmpate)}%")
+        appendLine("Maior probabilidade de empate: ${"%.1f".format(java.util.Locale.US, maiorProbEmpate)}%")
+        appendLine("Partidas com dados de gols esperados: ${partidasComGolsEsperados.size} de ${simulados.size}")
+        appendLine("Média de gols esperados: ${"%.2f".format(java.util.Locale.US, mediaGolsEsperadosCasa)} casa x ${"%.2f".format(java.util.Locale.US, mediaGolsEsperadosFora)} fora")
+        appendLine("Diferença média entre os times: ${"%.2f".format(java.util.Locale.US, diferencaMediaGolsEsperados)} gol")
+        appendLine("Jogos com gols esperados separados por até 0,25: $jogosComGolsProximos")
+        appendLine("Empate ficou até 5 pontos do favorito: $empatesAteCincoPontos")
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -943,6 +999,16 @@ Row(
             colors = CardDefaults.cardColors(containerColor = corCartao)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Button(
+                        onClick = { clipboardManager.setText(AnnotatedString(relatorioDiagnostico)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = corDestaque)
+                    ) {
+                        Text("📋 COPIAR RELATÓRIO COMPLETO", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 Text("DIAGNÓSTICO DOS ERROS", color = corDestaque, fontWeight = FontWeight.Bold)
                 Text("Acerto por resultado previsto", color = Color.White, fontSize = 12.sp)
                 Text("Vitória da casa: ${taxaDoGrupo(simuladosCasa)}", color = Color.White, fontSize = 12.sp)
