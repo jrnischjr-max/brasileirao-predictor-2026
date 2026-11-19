@@ -312,9 +312,9 @@ object HistoricoPalpitesNuvem {
         val temProbabilidades = palpite.has("probCasa") &&
             palpite.has("probEmpate") && palpite.has("probFora")
         val resultadoPrevisto = if (temProbabilidades) {
-            val probCasa = palpite.optInt("probCasa")
-            val probEmpate = palpite.optInt("probEmpate")
-            val probFora = palpite.optInt("probFora")
+            val probCasa = palpite.optDouble("probCasaExata", palpite.optDouble("probCasa"))
+            val probEmpate = palpite.optDouble("probEmpateExata", palpite.optDouble("probEmpate"))
+            val probFora = palpite.optDouble("probForaExata", palpite.optDouble("probFora"))
             when {
                 probCasa >= probEmpate && probCasa >= probFora -> "CASA"
                 probEmpate >= probFora -> "EMPATE"
