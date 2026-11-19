@@ -90,6 +90,84 @@ object HistoricoPalpitesNuvem {
             }
     }
 
+    fun gerarSimulacaoHistorica(
+        uid: String,
+        jogos: List<JSONObject>,
+        callback: (Int, String?) -> Unit
+    ) {
+        colecao(uid).get()
+            .addOnSuccessListener { existentes ->
+                val idsExistentes = existentes.documents.map { it.id }.toSet()
+                val lote = db.batch()
+                var quantidade = 0
+
+                jogos.forEach { jogo ->
+                    val situacao = jogo.optString("situacao").uppercase()
+                    if (situacao !in listOf("FINISHED", "FINALIZADO", "AWARDED")) return@forEach
+
+                    val casa = jogo.optJSONObject("mandante")?.optString("nome", "").orEmpty()
+                    val fora = jogo.optJSONObject("visitante")?.optString("nome", "").orEmpty()
+                    val id = jogo.optString("id").ifBlank {
+                        "${jogo.optString("rodada")}_${jogo.optString("data")}_${casa}_${fora}"
+                    }
+                    if (id in idsExistentes || casa.isBlank() || fora.isBlank()) return@forEach
+
+                    val placar = jogo.optJSONObject("placar") ?: return@forEach
+                    val golsCasa = placar.optInt("mandante", -1)
+                    val golsFora = placar.optInt("visitante", -1)
+                    if (golsCasa < 0 || golsFora < 0) return@forEach
+
+                    val analise = MotorPalpites.analisarHistorico(jogo, jogos) ?: return@forEach
+                    val previsto = when {
+                        analise.placarCasa > analise.placarFora -> "CASA"
+                        analise.placarCasa < analise.placarFora -> "FORA"
+                        else -> "EMPATE"
+                    }
+                    val real = when {
+                        golsCasa > golsFora -> "CASA"
+                        golsCasa < golsFora -> "FORA"
+                        else -> "EMPATE"
+                    }
+
+                    val registro = hashMapOf<String, Any>(
+                        "idJogo" to id,
+                        "rodada" to jogo.optString("rodada"),
+                        "data" to jogo.optString("data"),
+                        "mandante" to casa,
+                        "visitante" to fora,
+                        "probCasa" to analise.probCasa,
+                        "probEmpate" to analise.probEmpate,
+                        "probFora" to analise.probFora,
+                        "placarCasa" to analise.placarCasa,
+                        "placarFora" to analise.placarFora,
+                        "resultadoPrevisto" to previsto,
+                        "golsReaisCasa" to golsCasa,
+                        "golsReaisFora" to golsFora,
+                        "resultadoReal" to real,
+                        "acertouResultado" to (previsto == real),
+                        "acertouPlacar" to (analise.placarCasa == golsCasa && analise.placarFora == golsFora),
+                        "finalizado" to true,
+                        "origem" to "SIMULACAO_HISTORICA"
+                    )
+                    lote.set(colecao(uid).document(id), registro)
+                    quantidade++
+                }
+
+                if (quantidade == 0) {
+                    callback(0, null)
+                } else {
+                    lote.commit()
+                        .addOnSuccessListener { callback(quantidade, null) }
+                        .addOnFailureListener { erro ->
+                            callback(0, erro.message ?: "Erro ao salvar simulação histórica.")
+                        }
+                }
+            }
+            .addOnFailureListener { erro ->
+                callback(0, erro.message ?: "Erro ao consultar histórico existente.")
+            }
+    }
+
     fun atualizarResultados(
         uid: String,
         jogos: List<JSONObject>,
