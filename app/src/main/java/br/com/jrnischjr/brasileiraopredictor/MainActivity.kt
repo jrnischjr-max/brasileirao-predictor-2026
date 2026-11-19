@@ -256,7 +256,8 @@ fun PredictorApp() {
             ) {
                 TelaPrincipal(
                     nome = nomeUsuario,
-                    time = time
+                    time = time,
+                    uid = auth.currentUser?.uid.orEmpty()
                 )
             }
         } else if (usuarioLogado) {
@@ -618,7 +619,7 @@ fun PredictorApp() {
 
    
 @Composable
-fun TelaPrincipal(nome: String, time: String) {
+fun TelaPrincipal(nome: String, time: String, uid: String) {
     var abaSelecionada by remember { mutableStateOf("Início") }
     var carregandoJogos by remember { mutableStateOf(false) }
     var erroJogos by remember { mutableStateOf("") }
@@ -1103,7 +1104,8 @@ Row(
                 "Palpites" -> {
                     TelaPalpites(
                         corDestaque = corDestaque,
-                        corCartao = corCartao
+                        corCartao = corCartao,
+                        uid = uid
                     )
                 }
             }
