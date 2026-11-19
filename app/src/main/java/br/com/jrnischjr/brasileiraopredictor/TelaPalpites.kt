@@ -15,10 +15,9 @@ import androidx.compose.ui.Alignment
 @Composable
 fun TelaPalpites(
     corDestaque: Color,
-    corCartao: Color
+    corCartao: Color,
+    uid: String
 ) {
-    val context = LocalContext.current
-
     val jogos = remember { mutableStateListOf<JSONObject>() }
     val clubes = remember { mutableStateListOf<JSONObject>() }
     val historico = remember { mutableStateListOf<JSONObject>() }
@@ -27,18 +26,48 @@ fun TelaPalpites(
     var erro by remember { mutableStateOf("") }
     var jogosProntos by remember { mutableStateOf(false) }
     var tabelaPronta by remember { mutableStateOf(false) }
+    var historicoCarregando by remember { mutableStateOf(true) }
+    var erroHistorico by remember { mutableStateOf("") }
+    var salvandoPalpite by remember { mutableStateOf(false) }
 
     var rodadaSelecionada by remember { mutableStateOf(0) }
     var rodadaMenuAberto by remember { mutableStateOf(false) }
 
-    fun atualizarHistorico() {
-        val atualizados = HistoricoPalpites.atualizarResultados(
-            context,
-            jogos.toList()
-        )
+    fun carregarHistorico() {
+        if (uid.isBlank()) {
+            historicoCarregando = false
+            erroHistorico = "Faça login para acessar seu histórico."
+            return
+        }
 
-        historico.clear()
-        historico.addAll(atualizados)
+        historicoCarregando = true
+        HistoricoPalpitesNuvem.carregar(uid) { lista, mensagem ->
+            historicoCarregando = false
+            if (lista != null) {
+                historico.clear()
+                historico.addAll(lista)
+                erroHistorico = ""
+            } else {
+                erroHistorico = mensagem ?: "Não foi possível carregar o histórico."
+            }
+        }
+    }
+
+    fun atualizarHistorico() {
+        if (uid.isBlank()) return
+
+        HistoricoPalpitesNuvem.atualizarResultados(
+            uid,
+            jogos.toList()
+        ) { atualizados, mensagem ->
+            if (atualizados != null) {
+                historico.clear()
+                historico.addAll(atualizados)
+                erroHistorico = ""
+            } else {
+                erroHistorico = mensagem ?: "Não foi possível atualizar o histórico."
+            }
+        }
     }
 
     fun carregarDados() {
@@ -86,6 +115,10 @@ fun TelaPalpites(
 
     LaunchedEffect(Unit) {
         carregarDados()
+    }
+
+    LaunchedEffect(uid) {
+        carregarHistorico()
     }
 
     LaunchedEffect(jogosProntos, tabelaPronta) {
@@ -460,15 +493,24 @@ Row(
 
                             Button(
                                 onClick = {
-                                    HistoricoPalpites.salvar(
-                                        context,
+                                    salvandoPalpite = true
+                                    erroHistorico = ""
+
+                                    HistoricoPalpitesNuvem.salvar(
+                                        uid,
                                         jogo,
                                         analise
-                                    )
-
-                                    atualizarHistorico()
+                                    ) { sucesso, mensagem ->
+                                        salvandoPalpite = false
+                                        if (sucesso) {
+                                            carregarHistorico()
+                                        } else {
+                                            erroHistorico = mensagem
+                                                ?: "Não foi possível salvar o palpite."
+                                        }
+                                    }
                                 },
-                                enabled = !jaSalvo,
+                                enabled = !jaSalvo && !salvandoPalpite && uid.isNotBlank(),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = corDestaque,
@@ -476,8 +518,11 @@ Row(
                                 )
                             ) {
                                 Text(
-                                    if (jaSalvo) "✓ PALPITE SALVO"
-                                    else "💾 SALVAR PALPITE",
+                                    when {
+                                        jaSalvo -> "✓ PALPITE SALVO"
+                                        salvandoPalpite -> "SALVANDO..."
+                                        else -> "💾 SALVAR PALPITE"
+                                    },
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -511,6 +556,22 @@ Row(
         )
 
         Spacer(modifier = Modifier.height(12.dp))
+
+        if (historicoCarregando) {
+            Text(
+                "Sincronizando histórico na nuvem...",
+                color = Color.LightGray,
+                fontSize = 12.sp
+            )
+        }
+
+        if (erroHistorico.isNotBlank()) {
+            Text(
+                erroHistorico,
+                color = Color(0xFFFF8A80),
+                fontSize = 12.sp
+            )
+        }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
