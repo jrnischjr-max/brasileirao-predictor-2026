@@ -24,6 +24,7 @@ fun TelaPalpites(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val jogos = remember { mutableStateListOf<JSONObject>() }
+    val jogosHistoricos = remember { mutableStateListOf<JSONObject>() }
     val clubes = remember { mutableStateListOf<JSONObject>() }
     val historico = remember { mutableStateListOf<JSONObject>() }
 
@@ -31,6 +32,8 @@ fun TelaPalpites(
     var erro by remember { mutableStateOf("") }
     var jogosProntos by remember { mutableStateOf(false) }
     var tabelaPronta by remember { mutableStateOf(false) }
+    var baseHistoricaPronta by remember { mutableStateOf(false) }
+    var erroBaseHistorica by remember { mutableStateOf("") }
     var historicoCarregando by remember { mutableStateOf(true) }
     var erroHistorico by remember { mutableStateOf("") }
     var salvandoPalpite by remember { mutableStateOf(false) }
@@ -118,6 +121,50 @@ fun TelaPalpites(
                 carregando = false
             }
         }
+
+        DadosBrasileirao.buscarHistorico { dados, mensagem ->
+            jogosHistoricos.clear()
+            val listaHistorica = dados?.optJSONArray("jogos")
+            if (listaHistorica != null) {
+                for (i in 0 until listaHistorica.length()) {
+                    listaHistorica.optJSONObject(i)?.let { jogosHistoricos.add(it) }
+                }
+            }
+
+            baseHistoricaPronta = true
+            erroBaseHistorica = when {
+                dados == null -> mensagem ?: "Não foi possível carregar a base histórica."
+                jogosHistoricos.isEmpty() -> "A API não retornou partidas históricas."
+                else -> {
+                    val temporadas = dados.optJSONArray("temporadasConsultadas")
+                    val temporadasOk = mutableListOf<String>()
+                    if (temporadas != null) {
+                        for (i in 0 until temporadas.length()) {
+                            val item = temporadas.optJSONObject(i) ?: continue
+                            if (item.optBoolean("sucesso")) {
+                                temporadasOk.add(item.optString("temporada"))
+                            }
+                        }
+                    }
+                    "Base histórica: " + jogosHistoricos.size +
+                        " jogos (" + temporadasOk.joinToString(", ") + ")."
+                }
+            }
+        }
+    }
+
+    // Une o calendário atual à memória histórica, removendo IDs repetidos.
+    // A ordenação cronológica é importante para forma e confrontos diretos.
+    val todosJogosMotor = remember(jogos.size, jogosHistoricos.size) {
+        (jogosHistoricos.toList() + jogos.toList())
+            .distinctBy { jogo ->
+                jogo.optString("id").ifBlank {
+                    jogo.optString("data") + "_" +
+                        jogo.optJSONObject("mandante")?.optString("nome").orEmpty() + "_" +
+                        jogo.optJSONObject("visitante")?.optString("nome").orEmpty()
+                }
+            }
+            .sortedBy { it.optString("data") }
     }
 
     LaunchedEffect(Unit) {
@@ -923,7 +970,7 @@ fun TelaPalpites(
 
                 val analise = MotorPalpites.analisar(
                     jogo = jogo,
-                    todosJogos = jogos.toList(),
+                    todosJogos = todosJogosMotor,
                     clubes = clubes.toList()
                 )
 
@@ -1363,7 +1410,7 @@ Row(
                 Button(
                     onClick = {
                         simulandoHistorico = true
-                        HistoricoPalpitesNuvem.gerarSimulacaoHistorica(uid, jogos.toList()) { quantidade, mensagem ->
+                        HistoricoPalpitesNuvem.gerarSimulacaoHistorica(uid, todosJogosMotor) { quantidade, mensagem ->
                             simulandoHistorico = false
                             if (mensagem != null) {
                                 erroHistorico = mensagem
@@ -1373,7 +1420,7 @@ Row(
                             }
                         }
                     },
-                    enabled = !simulandoHistorico && uid.isNotBlank() && jogosProntos,
+                    enabled = !simulandoHistorico && uid.isNotBlank() && jogosProntos && baseHistoricaPronta,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(if (simulandoHistorico) "GERANDO SIMULAÇÃO..." else "GERAR SIMULAÇÃO HISTÓRICA")
