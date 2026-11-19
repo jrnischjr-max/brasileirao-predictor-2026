@@ -458,6 +458,43 @@ fun TelaPalpites(
     val metricasBaseTeste = relatorioMetricas(testeDixon, 1.0)
     val metricasAjustadasTeste = relatorioMetricas(testeDixon, limiarEmpateEscolhido)
 
+    // Compara modelos usando exatamente o mesmo bloco futuro (30% mais recente).
+    fun avaliarCamposModelo(
+        grupo: List<JSONObject>,
+        chaves: List<String>
+    ): Pair<Int, Double> {
+        if (grupo.isEmpty()) return 0 to 0.0
+        var acertosModelo = 0
+        var brierModelo = 0.0
+        grupo.forEach { partida ->
+            val probs = chaves.map { partida.optDouble(it, Double.NaN) }
+            if (probs.any { !it.isFinite() }) return@forEach
+            val previsto = when (probs.indices.maxByOrNull { probs[it] } ?: 0) {
+                0 -> "CASA"
+                1 -> "EMPATE"
+                else -> "FORA"
+            }
+            val real = partida.optString("resultadoReal")
+            if (previsto == real) acertosModelo++
+            val alvos = listOf(real == "CASA", real == "EMPATE", real == "FORA")
+            brierModelo += probs.indices.sumOf { i ->
+                val erro = probs[i] / 100.0 - if (alvos[i]) 1.0 else 0.0
+                erro * erro
+            }
+        }
+        return acertosModelo to (brierModelo / grupo.size)
+    }
+
+    val avaliacaoAtualTeste = avaliarCamposModelo(
+        testeDixon, listOf("probCasaExata", "probEmpateExata", "probForaExata")
+    )
+    val avaliacaoEloTeste = avaliarCamposModelo(
+        testeDixon, listOf("eloProbCasa", "eloProbEmpate", "eloProbFora")
+    )
+    val avaliacaoCombinadoTeste = avaliarCamposModelo(
+        testeDixon, listOf("combinadoProbCasa", "combinadoProbEmpate", "combinadoProbFora")
+    )
+
     // Raio-X específico para entender por que o empate não é escolhido.
     val probabilidadesEmpate = simulados.map {
         probabilidade(it, "probEmpateExata", "probEmpate")
@@ -572,6 +609,11 @@ fun TelaPalpites(
         appendLine("Treino: ${treinoDixon.size} jogos • Teste futuro: ${testeDixon.size} jogos")
         appendLine("Modelo original no teste: ${resultadoBaseTeste.first}/${resultadoBaseTeste.second}")
         appendLine("Modelo experimental no teste: ${resultadoAjustadoTeste.first}/${resultadoAjustadoTeste.second}")
+        appendLine("COMPARAÇÃO DE MODELOS NO MESMO TESTE FUTURO")
+        appendLine("Motor atual: ${avaliacaoAtualTeste.first}/${testeDixon.size} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoAtualTeste.second)}")
+        appendLine("Elo: ${avaliacaoEloTeste.first}/${testeDixon.size} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoEloTeste.second)}")
+        appendLine("Combinação 50/50: ${avaliacaoCombinadoTeste.first}/${testeDixon.size} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoCombinadoTeste.second)}")
+        appendLine("Atenção: gere novamente a simulação histórica para preencher os resultados Elo e combinado.")
         appendLine("LABORATÓRIO: VANTAGEM DO MANDANTE")
         fatoresMandante.forEach { fator ->
             val resultado = avaliarFatorMandante(treinoDixon, fator)
