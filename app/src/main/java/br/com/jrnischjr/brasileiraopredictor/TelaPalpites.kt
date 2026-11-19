@@ -9,6 +9,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONObject
@@ -32,6 +34,7 @@ fun TelaPalpites(
     var historicoCarregando by remember { mutableStateOf(true) }
     var erroHistorico by remember { mutableStateOf("") }
     var salvandoPalpite by remember { mutableStateOf(false) }
+    var salvandoPalpiteUsuario by remember { mutableStateOf(false) }
     var simulandoHistorico by remember { mutableStateOf(false) }
 
     var rodadaSelecionada by remember { mutableStateOf(0) }
@@ -161,6 +164,18 @@ fun TelaPalpites(
         }
     }
 
+    fun partidaComecou(data: String): Boolean {
+        val inicio = try {
+            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+                isLenient = false
+            }.parse(data.take(19))?.time
+        } catch (_: Exception) {
+            null
+        }
+        return inicio == null || System.currentTimeMillis() >= inicio
+    }
+
     val jogosPendentes = jogos.filter {
         val situacao = it.optString("situacao").uppercase()
 
@@ -192,8 +207,17 @@ fun TelaPalpites(
 
     val finalizados = historico.filter {
         it.optBoolean("finalizado") &&
-            it.optString("origem") != "SIMULACAO_HISTORICA"
+            it.optString("origem") != "SIMULACAO_HISTORICA" &&
+            it.has("placarCasa") && it.has("placarFora")
     }
+
+    val finalizadosUsuario = historico.filter {
+        it.optBoolean("finalizado") && it.has("usuarioPlacarCasa") && it.has("usuarioPlacarFora")
+    }
+    val acertosUsuario = finalizadosUsuario.count { it.optBoolean("usuarioAcertouResultado") }
+    val acertosPlacarUsuario = finalizadosUsuario.count { it.optBoolean("usuarioAcertouPlacar") }
+    val taxaUsuario = if (finalizadosUsuario.isNotEmpty()) acertosUsuario * 100 / finalizadosUsuario.size else 0
+    val taxaPlacarUsuario = if (finalizadosUsuario.isNotEmpty()) acertosPlacarUsuario * 100 / finalizadosUsuario.size else 0
 
     val simulados = historico.filter {
         it.optBoolean("finalizado") &&
@@ -792,8 +816,17 @@ fun TelaPalpites(
 
                 if (analise != null) {
 
-                    val jaSalvo = historico.any {
+                    val registroDoJogo = historico.firstOrNull {
                         it.optString("idJogo") == idJogo
+                    }
+                    val jaSalvo = registroDoJogo?.has("probCasaExata") == true
+                    val usuarioJaSalvou = registroDoJogo?.has("usuarioPlacarCasa") == true
+                    val partidaBloqueada = partidaComecou(jogo.optString("data"))
+                    var golsUsuarioCasa by remember(idJogo, registroDoJogo?.optInt("usuarioPlacarCasa", -1)) {
+                        mutableStateOf(registroDoJogo?.optInt("usuarioPlacarCasa", -1)?.takeIf { it >= 0 }?.toString().orEmpty())
+                    }
+                    var golsUsuarioFora by remember(idJogo, registroDoJogo?.optInt("usuarioPlacarFora", -1)) {
+                        mutableStateOf(registroDoJogo?.optInt("usuarioPlacarFora", -1)?.takeIf { it >= 0 }?.toString().orEmpty())
                     }
 
                     Card(
@@ -947,6 +980,97 @@ Row(
                                 fontSize = 15.sp
                             )
 
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Divider(color = corDestaque.copy(alpha = 0.45f))
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                "🙋 SEU PALPITE",
+                                color = corDestaque,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                "Faça seu próprio placar. Ele fica salvo na sua conta e será avaliado após o jogo.",
+                                color = Color.LightGray,
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = golsUsuarioCasa,
+                                    onValueChange = { valor ->
+                                        if (valor.length <= 2 && valor.all { it.isDigit() }) golsUsuarioCasa = valor
+                                    },
+                                    label = { Text("Gols casa") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    enabled = !partidaBloqueada,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                )
+                                OutlinedTextField(
+                                    value = golsUsuarioFora,
+                                    onValueChange = { valor ->
+                                        if (valor.length <= 2 && valor.all { it.isDigit() }) golsUsuarioFora = valor
+                                    },
+                                    label = { Text("Gols fora") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    enabled = !partidaBloqueada,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                )
+                            }
+                            if (usuarioJaSalvou) {
+                                Text(
+                                    "Seu palpite salvo: ${registroDoJogo?.optInt("usuarioPlacarCasa")} x ${registroDoJogo?.optInt("usuarioPlacarFora")}",
+                                    color = Color(0xFF81C784),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    val casa = golsUsuarioCasa.toIntOrNull()
+                                    val fora = golsUsuarioFora.toIntOrNull()
+                                    if (casa == null || fora == null || casa !in 0..20 || fora !in 0..20) {
+                                        erroHistorico = "Preencha os dois placares com números de 0 a 20."
+                                    } else {
+                                        salvandoPalpiteUsuario = true
+                                        erroHistorico = ""
+                                        HistoricoPalpitesNuvem.salvarPalpiteUsuario(
+                                            uid, jogo, casa, fora
+                                        ) { sucesso, mensagem ->
+                                            salvandoPalpiteUsuario = false
+                                            if (sucesso) carregarHistorico()
+                                            else erroHistorico = mensagem ?: "Não foi possível salvar seu palpite."
+                                        }
+                                    }
+                                },
+                                enabled = !partidaBloqueada && !salvandoPalpiteUsuario &&
+                                    uid.isNotBlank() && golsUsuarioCasa.isNotBlank() && golsUsuarioFora.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = corDestaque,
+                                    disabledContainerColor = Color.DarkGray
+                                )
+                            ) {
+                                Text(
+                                    when {
+                                        partidaBloqueada -> "🔒 PALPITE ENCERRADO"
+                                        salvandoPalpiteUsuario -> "SALVANDO SEU PALPITE..."
+                                        usuarioJaSalvou -> "ATUALIZAR MEU PALPITE"
+                                        else -> "💾 SALVAR MEU PALPITE"
+                                    },
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Button(
@@ -968,7 +1092,7 @@ Row(
                                         }
                                     }
                                 },
-                                enabled = !jaSalvo && !salvandoPalpite && uid.isNotBlank(),
+                                enabled = !jaSalvo && !salvandoPalpite && uid.isNotBlank() && !partidaBloqueada,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = corDestaque,
@@ -977,7 +1101,8 @@ Row(
                             ) {
                                 Text(
                                     when {
-                                        jaSalvo -> "✓ PALPITE SALVO"
+                                        partidaBloqueada && !jaSalvo -> "🔒 PRAZO ENCERRADO"
+                                        jaSalvo -> "✓ PALPITE DO MOTOR SALVO"
                                         salvandoPalpite -> "SALVANDO..."
                                         else -> "💾 SALVAR PALPITE"
                                     },
@@ -1079,6 +1204,25 @@ Row(
                     color = Color.LightGray,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
+                )
+
+                Divider(color = corDestaque.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "MEUS PALPITES: ${finalizadosUsuario.size} jogos finalizados",
+                    color = corDestaque,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "ACERTO DO RESULTADO: $acertosUsuario de ${finalizadosUsuario.size} ($taxaUsuario%)",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+                Text(
+                    "PLACAR EXATO: $acertosPlacarUsuario de ${finalizadosUsuario.size} ($taxaPlacarUsuario%)",
+                    color = Color.White,
+                    fontSize = 13.sp
                 )
 
                 Text(
