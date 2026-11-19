@@ -6,6 +6,12 @@ import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
+data class Probabilidades1X2(
+    val casa: Double,
+    val empate: Double,
+    val fora: Double
+)
+
 data class AnalisePalpite(
     val probCasa: Int,
     val probEmpate: Int,
@@ -81,6 +87,50 @@ object MotorPalpites {
         }
 
         return resultado
+    }
+
+    // Dixon-Coles: ajusta apenas os quatro placares baixos,
+    // preservando as médias de gols e normalizando as probabilidades.
+    fun probabilidadesDixonColes(
+        mediaCasa: Double,
+        mediaFora: Double,
+        rho: Double
+    ): Probabilidades1X2 {
+        var casa = 0.0
+        var empate = 0.0
+        var fora = 0.0
+
+        for (gCasa in 0..10) {
+            for (gFora in 0..10) {
+                var fator = 1.0
+                if (gCasa == 0 && gFora == 0) {
+                    fator = 1.0 - mediaCasa * mediaFora * rho
+                } else if (gCasa == 0 && gFora == 1) {
+                    fator = 1.0 + mediaCasa * rho
+                } else if (gCasa == 1 && gFora == 0) {
+                    fator = 1.0 + mediaFora * rho
+                } else if (gCasa == 1 && gFora == 1) {
+                    fator = 1.0 - rho
+                }
+
+                val chance = poisson(mediaCasa, gCasa) *
+                    poisson(mediaFora, gFora) * fator.coerceAtLeast(0.0)
+
+                when {
+                    gCasa > gFora -> casa += chance
+                    gCasa == gFora -> empate += chance
+                    else -> fora += chance
+                }
+            }
+        }
+
+        val total = casa + empate + fora
+        if (total <= 0.0) return Probabilidades1X2(0.0, 0.0, 0.0)
+        return Probabilidades1X2(
+            casa = casa / total * 100.0,
+            empate = empate / total * 100.0,
+            fora = fora / total * 100.0
+        )
     }
 
     private fun partidasDoTime(
