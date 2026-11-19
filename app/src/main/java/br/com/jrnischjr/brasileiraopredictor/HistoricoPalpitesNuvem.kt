@@ -154,15 +154,32 @@ object HistoricoPalpitesNuvem {
                         }
                     }
 
-                    if (!jaEstavaFinalizado && palpite.optBoolean("finalizado")) {
+                    if (palpite.optBoolean("finalizado")) {
+                        // Reavalia também partidas antigas para preencher/corrigir
+                        // as métricas de resultado e placar exato no histórico.
+                        val resultadoAnterior = palpite.optString("resultadoReal")
+                        val acertouResultadoAnterior = palpite.optBoolean("acertouResultado")
+                        val acertouPlacarAnterior = palpite.optBoolean("acertouPlacar")
+                        val tinhaMetricas = palpite.has("resultadoReal") &&
+                            palpite.has("acertouResultado") &&
+                            palpite.has("acertouPlacar")
+
                         avaliar(palpite)
 
-                        lote.set(
-                            documento.reference,
-                            palpite.toMap(),
-                            SetOptions.merge()
-                        )
-                        houveAtualizacao = true
+                        val precisaSalvar = !jaEstavaFinalizado ||
+                            !tinhaMetricas ||
+                            resultadoAnterior != palpite.optString("resultadoReal") ||
+                            acertouResultadoAnterior != palpite.optBoolean("acertouResultado") ||
+                            acertouPlacarAnterior != palpite.optBoolean("acertouPlacar")
+
+                        if (precisaSalvar) {
+                            lote.set(
+                                documento.reference,
+                                palpite.toMap(),
+                                SetOptions.merge()
+                            )
+                            houveAtualizacao = true
+                        }
                     }
 
                     atualizados.add(palpite)
