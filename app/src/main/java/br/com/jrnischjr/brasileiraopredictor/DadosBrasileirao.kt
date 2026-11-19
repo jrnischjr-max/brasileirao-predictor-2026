@@ -14,6 +14,7 @@ object DadosBrasileirao {
 
     private fun buscarDados(
         endpoint: String,
+        timeoutMs: Int = 15000,
         callback: (JSONObject?, String?) -> Unit
     ) {
         Thread {
@@ -24,8 +25,8 @@ object DadosBrasileirao {
                 conexao = url.openConnection() as HttpURLConnection
 
                 conexao.requestMethod = "GET"
-                conexao.connectTimeout = 15000
-                conexao.readTimeout = 15000
+                conexao.connectTimeout = timeoutMs
+                conexao.readTimeout = timeoutMs
 
                 val codigo = conexao.responseCode
 
@@ -74,5 +75,13 @@ object DadosBrasileirao {
         callback: (JSONObject?, String?) -> Unit
     ) {
         buscarDados("fd-standings", callback)
+    }
+
+    // Carrega as temporadas históricas disponíveis no Worker.
+    // A consulta pode levar mais tempo porque o Worker consulta várias temporadas.
+    fun buscarHistorico(
+        callback: (JSONObject?, String?) -> Unit
+    ) {
+        buscarDados("fd-history", timeoutMs = 90000, callback = callback)
     }
 }
