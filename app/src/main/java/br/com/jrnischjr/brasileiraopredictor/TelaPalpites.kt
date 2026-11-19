@@ -462,19 +462,22 @@ fun TelaPalpites(
     fun avaliarCamposModelo(
         grupo: List<JSONObject>,
         chaves: List<String>
-    ): Pair<Int, Double> {
-        if (grupo.isEmpty()) return 0 to 0.0
+    ): Triple<Int, Int, Double> {
+        if (grupo.isEmpty()) return Triple(0, 0, 0.0)
         var acertosModelo = 0
+        var jogosValidos = 0
         var brierModelo = 0.0
         grupo.forEach { partida ->
             val probs = chaves.map { partida.optDouble(it, Double.NaN) }
             if (probs.any { !it.isFinite() }) return@forEach
+            val real = partida.optString("resultadoReal")
+            if (real !in listOf("CASA", "EMPATE", "FORA")) return@forEach
+            jogosValidos++
             val previsto = when (probs.indices.maxByOrNull { probs[it] } ?: 0) {
                 0 -> "CASA"
                 1 -> "EMPATE"
                 else -> "FORA"
             }
-            val real = partida.optString("resultadoReal")
             if (previsto == real) acertosModelo++
             val alvos = listOf(real == "CASA", real == "EMPATE", real == "FORA")
             brierModelo += probs.indices.sumOf { i ->
@@ -482,7 +485,7 @@ fun TelaPalpites(
                 erro * erro
             }
         }
-        return acertosModelo to (brierModelo / grupo.size)
+        return Triple(acertosModelo, jogosValidos, if (jogosValidos > 0) brierModelo / jogosValidos else 0.0)
     }
 
     val avaliacaoAtualTeste = avaliarCamposModelo(
@@ -610,10 +613,12 @@ fun TelaPalpites(
         appendLine("Modelo original no teste: ${resultadoBaseTeste.first}/${resultadoBaseTeste.second}")
         appendLine("Modelo experimental no teste: ${resultadoAjustadoTeste.first}/${resultadoAjustadoTeste.second}")
         appendLine("COMPARAÇÃO DE MODELOS NO MESMO TESTE FUTURO")
-        appendLine("Motor atual: ${avaliacaoAtualTeste.first}/${testeDixon.size} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoAtualTeste.second)}")
-        appendLine("Elo: ${avaliacaoEloTeste.first}/${testeDixon.size} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoEloTeste.second)}")
-        appendLine("Combinação 50/50: ${avaliacaoCombinadoTeste.first}/${testeDixon.size} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoCombinadoTeste.second)}")
-        appendLine("Atenção: gere novamente a simulação histórica para preencher os resultados Elo e combinado.")
+        appendLine("Motor atual: ${avaliacaoAtualTeste.first}/${avaliacaoAtualTeste.second} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoAtualTeste.third)}")
+        appendLine("Elo: ${avaliacaoEloTeste.first}/${avaliacaoEloTeste.second} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoEloTeste.third)}")
+        appendLine("Combinação 50/50: ${avaliacaoCombinadoTeste.first}/${avaliacaoCombinadoTeste.second} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoCombinadoTeste.third)}")
+        if (listOf(avaliacaoAtualTeste, avaliacaoEloTeste, avaliacaoCombinadoTeste).any { it.second < testeDixon.size }) {
+            appendLine("Atenção: alguns jogos não têm probabilidades salvas para todos os modelos. Gere novamente a simulação histórica.")
+        }
         appendLine("LABORATÓRIO: VANTAGEM DO MANDANTE")
         fatoresMandante.forEach { fator ->
             val resultado = avaliarFatorMandante(treinoDixon, fator)
