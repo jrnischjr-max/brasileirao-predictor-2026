@@ -8,6 +8,15 @@ object HistoricoPalpitesNuvem {
 
     private val db = FirebaseFirestore.getInstance()
 
+    private fun resultadoMaisProvavel(analise: AnalisePalpite): String {
+        return when {
+            analise.probCasa >= analise.probEmpate &&
+                analise.probCasa >= analise.probFora -> "CASA"
+            analise.probEmpate >= analise.probFora -> "EMPATE"
+            else -> "FORA"
+        }
+    }
+
     private fun colecao(uid: String) =
         db.collection("users")
             .document(uid)
@@ -56,11 +65,7 @@ object HistoricoPalpitesNuvem {
                     return@addOnSuccessListener
                 }
 
-                val resultadoPrevisto = when {
-                    analise.placarCasa > analise.placarFora -> "CASA"
-                    analise.placarCasa < analise.placarFora -> "FORA"
-                    else -> "EMPATE"
-                }
+                val resultadoPrevisto = resultadoMaisProvavel(analise)
 
                 val registro = hashMapOf<String, Any>(
                     "idJogo" to idJogo,
@@ -97,7 +102,7 @@ object HistoricoPalpitesNuvem {
     ) {
         colecao(uid).get()
             .addOnSuccessListener { existentes ->
-                val idsExistentes = existentes.documents.map { it.id }.toSet()
+                val documentosExistentes = existentes.documents.associateBy { it.id }
                 val lote = db.batch()
                 var quantidade = 0
 
@@ -110,7 +115,12 @@ object HistoricoPalpitesNuvem {
                     val id = jogo.optString("id").ifBlank {
                         "${jogo.optString("rodada")}_${jogo.optString("data")}_${casa}_${fora}"
                     }
-                    if (id in idsExistentes || casa.isBlank() || fora.isBlank()) return@forEach
+                    val documentoExistente = documentosExistentes[id]
+                    // Recalcula simulações antigas, mas nunca sobrescreve palpites reais.
+                    if ((documentoExistente != null &&
+                            documentoExistente.getString("origem") != "SIMULACAO_HISTORICA") ||
+                        casa.isBlank() || fora.isBlank()
+                    ) return@forEach
 
                     val placar = jogo.optJSONObject("placar") ?: return@forEach
                     val golsCasa = placar.optInt("mandante", -1)
@@ -118,11 +128,7 @@ object HistoricoPalpitesNuvem {
                     if (golsCasa < 0 || golsFora < 0) return@forEach
 
                     val analise = MotorPalpites.analisarHistorico(jogo, jogos) ?: return@forEach
-                    val previsto = when {
-                        analise.placarCasa > analise.placarFora -> "CASA"
-                        analise.placarCasa < analise.placarFora -> "FORA"
-                        else -> "EMPATE"
-                    }
+                    val previsto = resultadoMaisProvavel(analise)
                     val real = when {
                         golsCasa > golsFora -> "CASA"
                         golsCasa < golsFora -> "FORA"
@@ -297,10 +303,23 @@ object HistoricoPalpitesNuvem {
             else -> "EMPATE"
         }
 
-        val resultadoPrevisto = when {
-            previstoCasa > previstoFora -> "CASA"
-            previstoCasa < previstoFora -> "FORA"
-            else -> "EMPATE"
+        val temProbabilidades = palpite.has("probCasa") &&
+            palpite.has("probEmpate") && palpite.has("probFora")
+        val resultadoPrevisto = if (temProbabilidades) {
+            val probCasa = palpite.optInt("probCasa")
+            val probEmpate = palpite.optInt("probEmpate")
+            val probFora = palpite.optInt("probFora")
+            when {
+                probCasa >= probEmpate && probCasa >= probFora -> "CASA"
+                probEmpate >= probFora -> "EMPATE"
+                else -> "FORA"
+            }
+        } else {
+            when {
+                previstoCasa > previstoFora -> "CASA"
+                previstoCasa < previstoFora -> "FORA"
+                else -> "EMPATE"
+            }
         }
 
         palpite.put("resultadoPrevisto", resultadoPrevisto)
