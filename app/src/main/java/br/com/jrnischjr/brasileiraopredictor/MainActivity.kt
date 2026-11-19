@@ -699,6 +699,10 @@ fun TelaPrincipal(nome: String, time: String) {
             carregandoJogos = false
 
             if (dados != null) {
+                ultimaAtualizacaoJogos = java.text.SimpleDateFormat(
+    "HH:mm:ss",
+    java.util.Locale.getDefault()
+).format(java.util.Date())
                 val lista = dados.optJSONArray("jogos")
                 jogos.clear()
 
