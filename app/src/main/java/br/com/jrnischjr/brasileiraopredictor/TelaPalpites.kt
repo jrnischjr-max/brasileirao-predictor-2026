@@ -203,10 +203,13 @@ fun TelaPalpites(
     } else 0
 
     // Diagnóstico por tipo de resultado previsto e nível de confiança.
+    fun probabilidade(palpite: JSONObject, exata: String, inteira: String): Double =
+        palpite.optDouble(exata, palpite.optDouble(inteira).toDouble())
+
     fun resultadoPrevisto(palpite: JSONObject): String {
-        val casa = palpite.optInt("probCasa")
-        val empate = palpite.optInt("probEmpate")
-        val fora = palpite.optInt("probFora")
+        val casa = probabilidade(palpite, "probCasaExata", "probCasa")
+        val empate = probabilidade(palpite, "probEmpateExata", "probEmpate")
+        val fora = probabilidade(palpite, "probForaExata", "probFora")
         return when {
             casa >= empate && casa >= fora -> "CASA"
             empate >= fora -> "EMPATE"
@@ -224,14 +227,26 @@ fun TelaPalpites(
     val simuladosEmpate = simulados.filter { resultadoPrevisto(it) == "EMPATE" }
     val simuladosFora = simulados.filter { resultadoPrevisto(it) == "FORA" }
     val simuladosAltaConf = simulados.filter {
-        maxOf(it.optInt("probCasa"), it.optInt("probEmpate"), it.optInt("probFora")) >= 50
+        maxOf(
+            probabilidade(it, "probCasaExata", "probCasa"),
+            probabilidade(it, "probEmpateExata", "probEmpate"),
+            probabilidade(it, "probForaExata", "probFora")
+        ) >= 50.0
     }
     val simuladosMediaConf = simulados.filter {
-        val maior = maxOf(it.optInt("probCasa"), it.optInt("probEmpate"), it.optInt("probFora"))
-        maior in 40..49
+        val maior = maxOf(
+            probabilidade(it, "probCasaExata", "probCasa"),
+            probabilidade(it, "probEmpateExata", "probEmpate"),
+            probabilidade(it, "probForaExata", "probFora")
+        )
+        maior >= 40.0 && maior < 50.0
     }
     val simuladosBaixaConf = simulados.filter {
-        maxOf(it.optInt("probCasa"), it.optInt("probEmpate"), it.optInt("probFora")) < 40
+        maxOf(
+            probabilidade(it, "probCasaExata", "probCasa"),
+            probabilidade(it, "probEmpateExata", "probEmpate"),
+            probabilidade(it, "probForaExata", "probFora")
+        ) < 40.0
     }
 
     // Acerto de resultado significa acertar Casa/Empate/Fora (1X2).
