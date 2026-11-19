@@ -156,6 +156,7 @@ fun TelaTabela(
             clubes.forEach { clube ->
                 val posicao = clube.optInt("posicao")
                 val nome = clube.optString("nome", "Clube")
+                val escudo = clube.optString("escudo").takeIf { it.isNotBlank() }
                 val pontos = clube.optInt("pontos")
                 val jogos = clube.optInt("jogos")
                 val vitorias = clube.optInt("vitorias")
@@ -189,6 +190,14 @@ fun TelaTabela(
                                 fontSize = 15.sp,
                                 modifier = Modifier.width(32.dp)
                             )
+
+                            EscudoClube(
+                                url = escudo,
+                                nome = nome,
+                                tamanho = 26.dp
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             Text(
                                 nome,
