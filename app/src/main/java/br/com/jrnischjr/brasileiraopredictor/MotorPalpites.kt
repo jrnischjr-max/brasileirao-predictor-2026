@@ -13,7 +13,10 @@ data class AnalisePalpite(
     val placarCasa: Int,
     val placarFora: Int,
     val formaCasa: String,
-    val formaFora: String
+    val formaFora: String,
+    val probCasaExata: Double,
+    val probEmpateExata: Double,
+    val probForaExata: Double
 )
 
 object MotorPalpites {
@@ -439,12 +442,14 @@ object MotorPalpites {
 
         if (total <= 0.0) return null
 
-        val pCasa =
-            (vitoriaCasa / total * 100).roundToInt()
+        // Mantém as probabilidades completas para decidir o 1X2.
+        // O arredondamento acontece apenas nos valores exibidos/salvos como inteiros.
+        val probCasaExata = vitoriaCasa / total * 100.0
+        val probEmpateExata = empate / total * 100.0
+        val probForaExata = vitoriaFora / total * 100.0
 
-        val pEmpate =
-            (empate / total * 100).roundToInt()
-
+        val pCasa = probCasaExata.roundToInt()
+        val pEmpate = probEmpateExata.roundToInt()
         val pFora = 100 - pCasa - pEmpate
 
         return AnalisePalpite(
@@ -454,7 +459,10 @@ object MotorPalpites {
             placarCasa = esperadoCasa.roundToInt(),
             placarFora = esperadoFora.roundToInt(),
             formaCasa = formaCasa,
-            formaFora = formaFora
+            formaFora = formaFora,
+            probCasaExata = probCasaExata,
+            probEmpateExata = probEmpateExata,
+            probForaExata = probForaExata
         )
     }
 }
