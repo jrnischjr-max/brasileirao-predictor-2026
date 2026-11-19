@@ -109,48 +109,37 @@ fun TelaTabela(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(corCartao)
-                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                    .padding(vertical = 10.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "POS",
-                    color = corDestaque,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(32.dp)
-                )
+                fun cabecalho(texto: String, largura: Int) {
+                    Text(
+                        texto,
+                        color = corDestaque,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(largura.dp),
+                        maxLines = 1
+                    )
+                }
 
+                cabecalho("POS", 28)
                 Text(
                     "CLUBE",
                     color = corDestaque,
-                    fontSize = 10.sp,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
                 )
-
-                Text(
-                    "PTS",
-                    color = corDestaque,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(32.dp)
-                )
-
-                Text(
-                    "J",
-                    color = corDestaque,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(24.dp)
-                )
-
-                Text(
-                    "SG",
-                    color = corDestaque,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(28.dp)
-                )
+                cabecalho("PTS", 27)
+                cabecalho("J", 18)
+                cabecalho("SG", 22)
+                cabecalho("V", 18)
+                cabecalho("E", 18)
+                cabecalho("D", 18)
+                cabecalho("GP", 22)
+                cabecalho("GC", 22)
             }
 
             clubes.forEach { clube ->
@@ -174,71 +163,47 @@ fun TelaTabela(
                         containerColor = corCartao
                     )
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(10.dp)
+                            .padding(vertical = 9.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "${posicao}º",
-                                color = corDestaque,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 15.sp,
-                                modifier = Modifier.width(32.dp)
-                            )
+                        Text(
+                            "${posicao}º",
+                            color = corDestaque,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 11.sp,
+                            modifier = Modifier.width(28.dp),
+                            maxLines = 1
+                        )
 
-                            EscudoClube(
-                                url = escudo,
-                                nome = nome,
-                                tamanho = 26.dp
-                            )
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Text(
-                                nome,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            Text(
-                                "$pontos",
-                                color = corDestaque,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 14.sp,
-                                modifier = Modifier.width(32.dp)
-                            )
-
-                            Text(
-                                "$jogos",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                modifier = Modifier.width(24.dp)
-                            )
-
-                            Text(
-                                "$saldo",
-                                color = if (saldo > 0) Color(0xFF4ADE80)
-                                    else if (saldo < 0) Color(0xFFFF6B6B)
-                                    else Color.White,
-                                fontSize = 12.sp,
-                                modifier = Modifier.width(28.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
+                        EscudoClube(
+                            url = escudo,
+                            nome = nome,
+                            tamanho = 22.dp
+                        )
 
                         Text(
-                            "V $vitorias   E $empates   D $derrotas   GP $golsPro   GC $golsContra",
-                            color = Color.LightGray,
-                            fontSize = 10.sp
+                            nome,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 4.dp),
+                            maxLines = 1,
+                            softWrap = false
                         )
+
+                        Text("$pontos", color = corDestaque, fontWeight = FontWeight.Black, fontSize = 11.sp, modifier = Modifier.width(27.dp), maxLines = 1)
+                        Text("$jogos", color = Color.White, fontSize = 10.sp, modifier = Modifier.width(18.dp), maxLines = 1)
+                        Text("$saldo", color = if (saldo > 0) Color(0xFF4ADE80) else if (saldo < 0) Color(0xFFFF6B6B) else Color.White, fontSize = 10.sp, modifier = Modifier.width(22.dp), maxLines = 1)
+                        Text("$vitorias", color = Color.White, fontSize = 10.sp, modifier = Modifier.width(18.dp), maxLines = 1)
+                        Text("$empates", color = Color.White, fontSize = 10.sp, modifier = Modifier.width(18.dp), maxLines = 1)
+                        Text("$derrotas", color = Color.White, fontSize = 10.sp, modifier = Modifier.width(18.dp), maxLines = 1)
+                        Text("$golsPro", color = Color.White, fontSize = 10.sp, modifier = Modifier.width(22.dp), maxLines = 1)
+                        Text("$golsContra", color = Color.White, fontSize = 10.sp, modifier = Modifier.width(22.dp), maxLines = 1)
                     }
                 }
             }
