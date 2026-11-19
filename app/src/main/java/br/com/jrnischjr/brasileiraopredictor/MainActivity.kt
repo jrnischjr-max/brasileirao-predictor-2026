@@ -868,12 +868,31 @@ fun TelaPrincipal(nome: String, time: String) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        "Calendário oficial • Horário de Brasília",
-                        color = Color.LightGray,
-                        fontSize = 12.sp
-                    )
+    "Calendário oficial • Horário de Brasília",
+    color = Color.LightGray,
+    fontSize = 12.sp
+)
 
-                    Spacer(modifier = Modifier.height(15.dp))
+Spacer(modifier = Modifier.height(5.dp))
+
+Row(
+    verticalAlignment = Alignment.CenterVertically
+) {
+    Text(
+        "🔄 Última atualização: ",
+        color = Color.LightGray,
+        fontSize = 11.sp
+    )
+
+    Text(
+        ultimaAtualizacaoJogos ?: "Aguardando dados...",
+        color = corDestaque,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+Spacer(modifier = Modifier.height(15.dp))
 
                     if (carregandoJogos) {
                         CircularProgressIndicator(color = corDestaque)
