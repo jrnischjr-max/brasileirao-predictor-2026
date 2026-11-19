@@ -227,6 +227,32 @@ fun TelaPalpites(
     val simuladosEmpate = simulados.filter { resultadoPrevisto(it) == "EMPATE" }
     val simuladosFora = simulados.filter { resultadoPrevisto(it) == "FORA" }
 
+    // Experimento paralelo: Dixon-Coles em cima dos gols esperados já salvos.
+    // Não altera os palpites oficiais nem grava resultados no histórico.
+    val candidatosDixonColes = listOf(-0.05, -0.10, -0.15, -0.20, -0.25).map { rho ->
+        val avaliaveis = simulados.filter {
+            it.has("golsEsperadosCasa") && it.has("golsEsperadosFora") &&
+                it.has("resultadoReal")
+        }
+        val avaliados = avaliaveis.map { partida ->
+            val p = MotorPalpites.probabilidadesDixonColes(
+                partida.optDouble("golsEsperadosCasa"),
+                partida.optDouble("golsEsperadosFora"),
+                rho
+            )
+            val previsto = when {
+                p.casa >= p.empate && p.casa >= p.fora -> "CASA"
+                p.empate >= p.fora -> "EMPATE"
+                else -> "FORA"
+            }
+            Triple(previsto, partida.optString("resultadoReal"), p.empate)
+        }
+        val acertos = avaliados.count { it.first == it.second }
+        val empatesEscolhidos = avaliados.count { it.first == "EMPATE" }
+        val acertosEmpate = avaliados.count { it.first == "EMPATE" && it.second == "EMPATE" }
+        Triple(rho, avaliados.size, Triple(acertos, empatesEscolhidos, acertosEmpate))
+    }
+
     // Raio-X específico para entender por que o empate não é escolhido.
     val probabilidadesEmpate = simulados.map {
         probabilidade(it, "probEmpateExata", "probEmpate")
@@ -805,9 +831,34 @@ Row(
             colors = CardDefaults.cardColors(containerColor = corCartao)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
+                Text("TESTE PARALELO: DIXON-COLES", color = corDestaque, fontWeight = FontWeight.Bold)
+                Text(
+                    "Ajuste experimental dos placares baixos. Não altera os palpites oficiais.",
+                    color = Color.LightGray,
+                    fontSize = 11.sp
+                )
+                candidatosDixonColes.forEach { teste ->
+                    val rho = teste.first
+                    val quantidade = teste.second
+                    val acertos = teste.third.first
+                    val empatesEscolhidos = teste.third.second
+                    val acertosEmpate = teste.third.third
+                    val taxa = if (quantidade > 0) acertos * 100 / quantidade else 0
+                    Text(
+                        "ρ ${"%.2f".format(java.util.Locale.US, rho)}: $taxa% de acerto ($acertos/$quantidade) • empates previstos: $empatesEscolhidos • empates certos: $acertosEmpate",
+                        color = Color.White,
+                        fontSize = 11.sp
+                    )
+                }
+                Text(
+                    "O melhor ajuste será escolhido por desempenho comparativo, não apenas por aumentar a quantidade de empates.",
+                    color = Color.LightGray,
+                    fontSize = 10.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Text("RAIO-X DOS EMPATES", color = corDestaque, fontWeight = FontWeight.Bold)
                 Text(
-                    "Partidas analisadas: ${probabilidadesEmpate.size} de ${simulados.size}",
+                    "Partidas analisadas:", ${probabilidadesEmpate.size} de ${simulados.size}",
                     color = Color.White,
                     fontSize = 12.sp
                 )
