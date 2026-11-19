@@ -338,6 +338,43 @@ fun TelaPalpites(
     val resultadoMandoAjustadoTeste = if (validacaoTemporalDisponivel)
         avaliarFatorMandante(testeDixon, fatorMandanteEscolhido) else Triple(0, 0, 0)
 
+    // Laboratorio de decisao do empate: permite selecionar empate quando sua
+    // probabilidade fica suficientemente proxima da maior probabilidade rival.
+    // O limiar e escolhido no treino temporal e medido no bloco futuro.
+    fun avaliarLimiarEmpate(grupo: List<JSONObject>, limiar: Double): Triple<Int, Int, Int> {
+        var acertos = 0
+        var empatesPrevistos = 0
+        var empatesCertos = 0
+        grupo.forEach { partida ->
+            val pCasa = probabilidade(partida, "probCasaExata", "probCasa")
+            val pEmpate = probabilidade(partida, "probEmpateExata", "probEmpate")
+            val pFora = probabilidade(partida, "probForaExata", "probFora")
+            val maiorRival = maxOf(pCasa, pFora)
+            val previsto = if (pEmpate >= maiorRival * limiar) "EMPATE" else if (pCasa >= pFora) "CASA" else "FORA"
+            val real = partida.optString("resultadoReal")
+            if (previsto == real) acertos++
+            if (previsto == "EMPATE") {
+                empatesPrevistos++
+                if (real == "EMPATE") empatesCertos++
+            }
+        }
+        return Triple(acertos, empatesPrevistos, empatesCertos)
+    }
+
+    val limiaresEmpate = listOf(0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00)
+    val limiarEmpateEscolhido = if (validacaoTemporalDisponivel) {
+        limiaresEmpate.map { limiar -> limiar to avaliarLimiarEmpate(treinoDixon, limiar) }
+            .maxWithOrNull(
+                compareBy<Pair<Double, Triple<Int, Int, Int>>> { (_, resultado) ->
+                    if (treinoDixon.isNotEmpty()) resultado.first.toDouble() / treinoDixon.size else 0.0
+                }.thenBy { (limiar, _) -> limiar }
+            )?.first ?: 1.0
+    } else 1.0
+    val resultadoEmpateBaseTreino = if (validacaoTemporalDisponivel) avaliarLimiarEmpate(treinoDixon, 1.0) else Triple(0, 0, 0)
+    val resultadoEmpateAjustadoTreino = if (validacaoTemporalDisponivel) avaliarLimiarEmpate(treinoDixon, limiarEmpateEscolhido) else Triple(0, 0, 0)
+    val resultadoEmpateBaseTeste = if (validacaoTemporalDisponivel) avaliarLimiarEmpate(testeDixon, 1.0) else Triple(0, 0, 0)
+    val resultadoEmpateAjustadoTeste = if (validacaoTemporalDisponivel) avaliarLimiarEmpate(testeDixon, limiarEmpateEscolhido) else Triple(0, 0, 0)
+
     // Raio-X específico para entender por que o empate não é escolhido.
     val probabilidadesEmpate = simulados.map {
         probabilidade(it, "probEmpateExata", "probEmpate")
@@ -1026,6 +1063,29 @@ Row(
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp
                     )
+                } else {
+                    Text("Aguardando amostra suficiente para treino e teste temporal.", color = Color.LightGray, fontSize = 11.sp)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("LABORATÓRIO: DECISÃO DE EMPATE", color = corDestaque, fontWeight = FontWeight.Bold)
+                Text(
+                    "Testa quando aceitar o empate mesmo sem ele ser a maior probabilidade. O limiar é escolhido nos 70% jogos antigos e avaliado nos 30% seguintes. Não altera os palpites oficiais.",
+                    color = Color.LightGray,
+                    fontSize = 10.sp
+                )
+                if (validacaoTemporalDisponivel) {
+                    limiaresEmpate.forEach { limiar ->
+                        val resultado = avaliarLimiarEmpate(treinoDixon, limiar)
+                        Text(
+                            "Limiar ${"%.2f".format(java.util.Locale.US, limiar)}: ${resultado.first}/${treinoDixon.size} acertos • empates: ${resultado.second} • certos: ${resultado.third}",
+                            color = Color.White,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Text("Melhor limiar no treino: ${"%.2f".format(java.util.Locale.US, limiarEmpateEscolhido)}", color = corDestaque, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Treino, modelo atual: ${resultadoEmpateBaseTreino.first}/${treinoDixon.size} • ajustado: ${resultadoEmpateAjustadoTreino.first}/${treinoDixon.size}", color = Color.White, fontSize = 11.sp)
+                    Text("Teste futuro, modelo atual: ${resultadoEmpateBaseTeste.first}/${testeDixon.size} acertos • empates: ${resultadoEmpateBaseTeste.second} • certos: ${resultadoEmpateBaseTeste.third}", color = Color.White, fontSize = 11.sp)
+                    Text("Teste futuro, limiar ajustado: ${resultadoEmpateAjustadoTeste.first}/${testeDixon.size} acertos • empates: ${resultadoEmpateAjustadoTeste.second} • certos: ${resultadoEmpateAjustadoTeste.third}", color = corDestaque, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 } else {
                     Text("Aguardando amostra suficiente para treino e teste temporal.", color = Color.LightGray, fontSize = 11.sp)
                 }
