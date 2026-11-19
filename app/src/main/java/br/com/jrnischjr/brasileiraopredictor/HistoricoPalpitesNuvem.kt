@@ -352,9 +352,11 @@ object HistoricoPalpitesNuvem {
                             (palpite.has("usuarioResultadoReal") &&
                                 palpite.has("usuarioAcertouResultado") &&
                                 palpite.has("usuarioAcertouPlacar"))
-                        val tinhaMetricas = palpite.has("resultadoReal") &&
-                            palpite.has("acertouResultado") &&
-                            palpite.has("acertouPlacar")
+                        val temPalpiteMotor = palpite.has("placarCasa") && palpite.has("placarFora")
+                        val tinhaMetricas = !temPalpiteMotor ||
+                            (palpite.has("resultadoReal") &&
+                                palpite.has("acertouResultado") &&
+                                palpite.has("acertouPlacar"))
 
                         avaliar(palpite)
 
