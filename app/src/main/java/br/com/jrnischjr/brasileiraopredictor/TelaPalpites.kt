@@ -434,7 +434,7 @@ fun TelaPalpites(
             }
         }
         brier /= grupo.size
-        return linhas.joinToString("\\n") +
+        return linhas.joinToString("\n") +
             "\\nMacro-F1: ${"%.1f".format(java.util.Locale.US, macroF1(grupo, limiar) * 100)}%" +
             "\\nBrier multiclasses (menor é melhor): ${"%.4f".format(java.util.Locale.US, brier)}"
     }
@@ -1244,8 +1244,8 @@ Row(
                     Text("Teste futuro, limiar ajustado: ${resultadoEmpateAjustadoTeste.first}/${testeDixon.size} acertos • empates: ${resultadoEmpateAjustadoTeste.second} • certos: ${resultadoEmpateAjustadoTeste.third}", color = corDestaque, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("MÉTRICAS AVANÇADAS NO TESTE FUTURO", color = corDestaque, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    Text("Modelo original:\\n$metricasBaseTeste", color = Color.White, fontSize = 10.sp)
-                    Text("Limiar calibrado (\\${"%.2f".format(java.util.Locale.US, limiarEmpateEscolhido)}):\\n$metricasAjustadasTeste", color = Color.White, fontSize = 10.sp)
+                    Text("Modelo original:\n$metricasBaseTeste", color = Color.White, fontSize = 10.sp)
+                    Text("Limiar calibrado (${"%.2f".format(java.util.Locale.US, limiarEmpateEscolhido)}):\n$metricasAjustadasTeste", color = Color.White, fontSize = 10.sp)
                     Text("Seleção por Macro-F1 equilibra as três classes. Brier menor indica probabilidades melhores calibradas.", color = Color.LightGray, fontSize = 10.sp)
                 } else {
                     Text("Aguardando amostra suficiente para treino e teste temporal.", color = Color.LightGray, fontSize = 11.sp)
