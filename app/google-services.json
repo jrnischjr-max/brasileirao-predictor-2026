@@ -12,7 +12,20 @@
           "package_name": "br.com.jrnischjr.brasileiraopredictor"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "225614080330-0poc6btdl779n21ctkcr2rpqbponhio3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "br.com.jrnischjr.brasileiraopredictor",
+            "certificate_hash": "87e2e9945a72a9ada4802130d1401fee51e5cc1f"
+          }
+        },
+        {
+          "client_id": "225614080330-nntuemb7tcurafgglidhoe0h3mlvrmr8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC6P2xDJlv4SNPP5m3WamRBglVa0koRPss"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "225614080330-nntuemb7tcurafgglidhoe0h3mlvrmr8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
