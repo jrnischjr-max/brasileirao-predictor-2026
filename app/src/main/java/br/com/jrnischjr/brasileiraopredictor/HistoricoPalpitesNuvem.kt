@@ -187,8 +187,7 @@ object HistoricoPalpitesNuvem {
         colecao(uid).get()
             .addOnSuccessListener { existentes ->
                 val documentosExistentes = existentes.documents.associateBy { it.id }
-                val lote = db.batch()
-                var quantidade = 0
+                val operacoes = mutableListOf<Pair<com.google.firebase.firestore.DocumentReference, Map<String, Any>>>()
 
                 jogos.forEach { jogo ->
                     val situacao = jogo.optString("situacao").uppercase()
@@ -200,7 +199,8 @@ object HistoricoPalpitesNuvem {
                         "${jogo.optString("rodada")}_${jogo.optString("data")}_${casa}_${fora}"
                     }
                     val documentoExistente = documentosExistentes[id]
-                    // Recalcula simulações antigas, mas nunca sobrescreve palpites reais.
+
+                    // Nunca sobrescreve palpites reais do motor ou do usuário.
                     if ((documentoExistente != null &&
                             documentoExistente.getString("origem") != "SIMULACAO_HISTORICA") ||
                         casa.isBlank() || fora.isBlank()
@@ -228,6 +228,7 @@ object HistoricoPalpitesNuvem {
 
                     val registro = hashMapOf<String, Any>(
                         "idJogo" to id,
+                        "temporada" to jogo.optInt("temporada", 0),
                         "rodada" to jogo.optString("rodada"),
                         "data" to jogo.optString("data"),
                         "mandante" to casa,
@@ -235,9 +236,9 @@ object HistoricoPalpitesNuvem {
                         "probCasa" to analise.probCasa,
                         "probEmpate" to analise.probEmpate,
                         "probFora" to analise.probFora,
-                    "probCasaExata" to analise.probCasaExata,
-                    "probEmpateExata" to analise.probEmpateExata,
-                    "probForaExata" to analise.probForaExata,
+                        "probCasaExata" to analise.probCasaExata,
+                        "probEmpateExata" to analise.probEmpateExata,
+                        "probForaExata" to analise.probForaExata,
                         "eloProbCasa" to eloCasa,
                         "eloProbEmpate" to eloEmpate,
                         "eloProbFora" to eloFora,
@@ -253,23 +254,56 @@ object HistoricoPalpitesNuvem {
                         "golsReaisFora" to golsFora,
                         "resultadoReal" to real,
                         "acertouResultado" to (previsto == real),
-                        "acertouPlacar" to (analise.placarCasa == golsCasa && analise.placarFora == golsFora),
+                        "acertouPlacar" to (
+                            analise.placarCasa == golsCasa &&
+                                analise.placarFora == golsFora
+                            ),
                         "finalizado" to true,
                         "origem" to "SIMULACAO_HISTORICA"
                     )
-                    lote.set(colecao(uid).document(id), registro)
-                    quantidade++
+
+                    operacoes.add(
+                        colecao(uid).document(id) to registro
+                    )
                 }
 
-                if (quantidade == 0) {
+                if (operacoes.isEmpty()) {
                     callback(0, null)
-                } else {
+                    return@addOnSuccessListener
+                }
+
+                // Firestore aceita no máximo 500 operações por lote.
+                // Usamos 450 para manter margem e enviamos os lotes em sequência.
+                fun confirmarLote(indiceInicial: Int, totalGravado: Int) {
+                    if (indiceInicial >= operacoes.size) {
+                        callback(totalGravado, null)
+                        return
+                    }
+
+                    val indiceFinal = minOf(indiceInicial + 450, operacoes.size)
+                    val lote = db.batch()
+
+                    for (indice in indiceInicial until indiceFinal) {
+                        val (referencia, registro) = operacoes[indice]
+                        lote.set(referencia, registro)
+                    }
+
                     lote.commit()
-                        .addOnSuccessListener { callback(quantidade, null) }
+                        .addOnSuccessListener {
+                            confirmarLote(
+                                indiceFinal,
+                                totalGravado + (indiceFinal - indiceInicial)
+                            )
+                        }
                         .addOnFailureListener { erro ->
-                            callback(0, erro.message ?: "Erro ao salvar simulação histórica.")
+                            callback(
+                                totalGravado,
+                                erro.message ?: "Erro ao salvar lote da simulação histórica."
+                            )
                         }
                 }
+
+                confirmarLote(0, 0)
             }
             .addOnFailureListener { erro ->
                 callback(0, erro.message ?: "Erro ao consultar histórico existente.")
