@@ -42,7 +42,7 @@ object AgendadorNotificacoes {
             if (atraso <= 0) return
             val dados = workDataOf("casa" to casa, "fora" to fora, "chave" to chave)
             val pedido = OneTimeWorkRequestBuilder<LembreteJogoWorker>().setInputData(dados).setInitialDelay(atraso, TimeUnit.MILLISECONDS).build()
-            WorkManager.getInstance(context).enqueueUniqueWork("lembrete_${chave.hashCode()}", ExistingWorkPolicy.REPLACE, pedido)
+            WorkManager.getInstance(context).enqueueUniqueWork("lembrete_${chave.hashCode()}", ExistingWorkPolicy.KEEP, pedido)
         } catch (_: Exception) { }
     }
 }
