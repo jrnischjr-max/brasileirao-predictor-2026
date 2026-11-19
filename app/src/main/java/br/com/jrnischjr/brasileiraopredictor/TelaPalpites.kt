@@ -352,6 +352,21 @@ fun TelaPalpites(
         ) < 40.0
     }
 
+    // Compara a distribuição real dos resultados com as probabilidades
+    // que o motor atribuiu a cada classe. Isso revela viés sem alterar previsões.
+    val simuladosCasaReal = simulados.filter { it.optString("resultadoReal") == "CASA" }
+    val simuladosEmpateReal = simulados.filter { it.optString("resultadoReal") == "EMPATE" }
+    val simuladosForaReal = simulados.filter { it.optString("resultadoReal") == "FORA" }
+
+    fun mediaProbabilidade(grupo: List<JSONObject>, exata: String, inteira: String): Double {
+        val valores = grupo.map { probabilidade(it, exata, inteira) }.filter { it.isFinite() }
+        return valores.average().takeIf { valores.isNotEmpty() && it.isFinite() } ?: 0.0
+    }
+
+    val mediaProbCasaEmVitoriasCasa = mediaProbabilidade(simuladosCasaReal, "probCasaExata", "probCasa")
+    val mediaProbEmpateEmEmpates = mediaProbabilidade(simuladosEmpateReal, "probEmpateExata", "probEmpate")
+    val mediaProbForaEmVitoriasFora = mediaProbabilidade(simuladosForaReal, "probForaExata", "probFora")
+
     // Acerto de resultado significa acertar Casa/Empate/Fora (1X2).
     val acertos = finalizados.count {
         it.optBoolean("acertouResultado")
@@ -857,6 +872,12 @@ Row(
                 Text("Vitória da casa: ${taxaDoGrupo(simuladosCasa)}", color = Color.White, fontSize = 12.sp)
                 Text("Empate: ${taxaDoGrupo(simuladosEmpate)}", color = Color.White, fontSize = 12.sp)
                 Text("Vitória de fora: ${taxaDoGrupo(simuladosFora)}", color = Color.White, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("DISTRIBUIÇÃO DOS RESULTADOS REAIS", color = corDestaque, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Text("Vitórias da casa: ${simuladosCasaReal.size} • Empates: ${simuladosEmpateReal.size} • Vitórias de fora: ${simuladosForaReal.size}", color = Color.White, fontSize = 12.sp)
+                Text("Probabilidade média dada à casa quando ela venceu: ${"%.1f".format(java.util.Locale.US, mediaProbCasaEmVitoriasCasa)}%", color = Color.White, fontSize = 11.sp)
+                Text("Probabilidade média de empate nos empates reais: ${"%.1f".format(java.util.Locale.US, mediaProbEmpateEmEmpates)}%", color = Color.White, fontSize = 11.sp)
+                Text("Probabilidade média dada ao visitante quando ele venceu: ${"%.1f".format(java.util.Locale.US, mediaProbForaEmVitoriasFora)}%", color = Color.White, fontSize = 11.sp)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Acerto por confiança máxima", color = Color.White, fontSize = 12.sp)
                 Text("50% ou mais: ${taxaDoGrupo(simuladosAltaConf)}", color = Color.White, fontSize = 12.sp)
