@@ -50,6 +50,8 @@ fun PredictorApp() {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     var mensagemGoogle by remember { mutableStateOf("") }
+    var usuarioLogado by remember { mutableStateOf(auth.currentUser != null) }
+    var biometriaLiberada by remember { mutableStateOf(false) }
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -68,6 +70,8 @@ fun PredictorApp() {
                     auth.signInWithCredential(credencial)
                         .addOnSuccessListener {
                             mensagemGoogle = "Login com Google realizado! Bem-vindo de volta. ✅"
+                            usuarioLogado = true
+                            biometriaLiberada = false
                         }
                         .addOnFailureListener { erro ->
                             mensagemGoogle = "Não foi possível entrar com Google: ${erro.localizedMessage ?: "tente novamente."}"
@@ -158,12 +162,7 @@ fun PredictorApp() {
     var mensagem by remember { mutableStateOf("") }
     var carregando by remember { mutableStateOf(false) }
 
-    var usuarioLogado by remember {
-        mutableStateOf(auth.currentUser != null)
-    }
-
     var nomeUsuario by remember { mutableStateOf("") }
-    var biometriaLiberada by remember { mutableStateOf(false) }
     var autenticacaoIniciada by remember { mutableStateOf(false) }
 
     val fundo = when (time) {
