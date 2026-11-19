@@ -647,7 +647,7 @@ Row(
 
         historico.sortedByDescending {
             it.optString("data")
-        }.take(10).forEach { palpite ->
+        }.forEach { palpite ->
 
             val finalizado = palpite.optBoolean("finalizado")
 
