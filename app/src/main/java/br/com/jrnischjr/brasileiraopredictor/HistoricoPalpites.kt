@@ -30,6 +30,64 @@ object HistoricoPalpites {
         }
     }
 
+    private fun resultadoDoPlacar(
+        golsCasa: Int,
+        golsFora: Int
+    ): String {
+        return when {
+            golsCasa > golsFora -> "CASA"
+            golsCasa < golsFora -> "FORA"
+            else -> "EMPATE"
+        }
+    }
+
+    private fun atualizarAvaliacao(palpite: JSONObject) {
+        val golsReaisCasa =
+            palpite.optInt("golsReaisCasa", -1)
+
+        val golsReaisFora =
+            palpite.optInt("golsReaisFora", -1)
+
+        val placarPrevistoCasa =
+            palpite.optInt("placarCasa", -1)
+
+        val placarPrevistoFora =
+            palpite.optInt("placarFora", -1)
+
+        if (
+            golsReaisCasa < 0 ||
+            golsReaisFora < 0 ||
+            placarPrevistoCasa < 0 ||
+            placarPrevistoFora < 0
+        ) {
+            return
+        }
+
+        val resultadoReal = resultadoDoPlacar(
+            golsReaisCasa,
+            golsReaisFora
+        )
+
+        val resultadoPrevisto = resultadoDoPlacar(
+            placarPrevistoCasa,
+            placarPrevistoFora
+        )
+
+        palpite.put("resultadoPrevisto", resultadoPrevisto)
+        palpite.put("resultadoReal", resultadoReal)
+
+        palpite.put(
+            "acertouResultado",
+            resultadoPrevisto == resultadoReal
+        )
+
+        palpite.put(
+            "acertouPlacar",
+            placarPrevistoCasa == golsReaisCasa &&
+                placarPrevistoFora == golsReaisFora
+        )
+    }
+
     fun salvar(
         context: Context,
         jogo: JSONObject,
@@ -47,6 +105,11 @@ object HistoricoPalpites {
 
         val palpites = carregar(context).toMutableList()
 
+        val resultadoPrevisto = resultadoDoPlacar(
+            analise.placarCasa,
+            analise.placarFora
+        )
+
         val registro = JSONObject().apply {
             put("idJogo", idJogo)
             put("rodada", jogo.optString("rodada"))
@@ -61,18 +124,7 @@ object HistoricoPalpites {
             put("placarCasa", analise.placarCasa)
             put("placarFora", analise.placarFora)
 
-            put(
-                "resultadoPrevisto",
-                when {
-                    analise.probCasa >= analise.probEmpate &&
-                    analise.probCasa >= analise.probFora -> "CASA"
-
-                    analise.probFora >= analise.probEmpate -> "FORA"
-
-                    else -> "EMPATE"
-                }
-            )
-
+            put("resultadoPrevisto", resultadoPrevisto)
             put("finalizado", false)
         }
 
@@ -84,6 +136,7 @@ object HistoricoPalpites {
             if (palpites[indice].optBoolean("finalizado")) {
                 return
             }
+
             palpites[indice] = registro
         } else {
             palpites.add(registro)
@@ -100,7 +153,10 @@ object HistoricoPalpites {
         val palpites = carregar(context).toMutableList()
 
         palpites.forEach { palpite ->
+
+            // Reavalia também os palpites antigos já finalizados.
             if (palpite.optBoolean("finalizado")) {
+                atualizarAvaliacao(palpite)
                 return@forEach
             }
 
@@ -126,7 +182,8 @@ object HistoricoPalpites {
                 .optString("situacao")
                 .uppercase()
 
-            if (situacao !in listOf(
+            if (
+                situacao !in listOf(
                     "FINISHED",
                     "FINALIZADO",
                     "AWARDED"
@@ -145,34 +202,11 @@ object HistoricoPalpites {
                 return@forEach
             }
 
-            val resultadoReal = when {
-                golsCasa > golsFora -> "CASA"
-                golsCasa < golsFora -> "FORA"
-                else -> "EMPATE"
-            }
-
-            val placarPrevistoCasa =
-                palpite.optInt("placarCasa")
-
-            val placarPrevistoFora =
-                palpite.optInt("placarFora")
-
             palpite.put("golsReaisCasa", golsCasa)
             palpite.put("golsReaisFora", golsFora)
-            palpite.put("resultadoReal", resultadoReal)
-
-            palpite.put(
-                "acertouResultado",
-                palpite.optString("resultadoPrevisto") == resultadoReal
-            )
-
-            palpite.put(
-                "acertouPlacar",
-                placarPrevistoCasa == golsCasa &&
-                placarPrevistoFora == golsFora
-            )
-
             palpite.put("finalizado", true)
+
+            atualizarAvaliacao(palpite)
         }
 
         gravar(context, palpites)
@@ -196,4 +230,3 @@ object HistoricoPalpites {
             .apply()
     }
 }
-
