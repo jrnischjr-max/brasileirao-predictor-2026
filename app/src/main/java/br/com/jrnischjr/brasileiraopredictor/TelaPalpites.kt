@@ -233,6 +233,21 @@ fun TelaPalpites(
     }.filter { it.isFinite() }
     val mediaProbEmpate = probabilidadesEmpate.average().takeIf { it.isFinite() } ?: 0.0
     val maiorProbEmpate = probabilidadesEmpate.maxOrNull() ?: 0.0
+    val partidasComGolsEsperados = simulados.filter {
+        it.has("golsEsperadosCasa") && it.has("golsEsperadosFora")
+    }
+    val mediaGolsEsperadosCasa = partidasComGolsEsperados.map {
+        it.optDouble("golsEsperadosCasa")
+    }.average().takeIf { it.isFinite() } ?: 0.0
+    val mediaGolsEsperadosFora = partidasComGolsEsperados.map {
+        it.optDouble("golsEsperadosFora")
+    }.average().takeIf { it.isFinite() } ?: 0.0
+    val diferencaMediaGolsEsperados = partidasComGolsEsperados.map {
+        kotlin.math.abs(it.optDouble("golsEsperadosCasa") - it.optDouble("golsEsperadosFora"))
+    }.average().takeIf { it.isFinite() } ?: 0.0
+    val jogosComGolsProximos = partidasComGolsEsperados.count {
+        kotlin.math.abs(it.optDouble("golsEsperadosCasa") - it.optDouble("golsEsperadosFora")) <= 0.25
+    }
     val empatesAteCincoPontos = simulados.count { palpite ->
         val empate = probabilidade(palpite, "probEmpateExata", "probEmpate")
         val maiorAdversaria = maxOf(
@@ -812,12 +827,32 @@ Row(
                     fontSize = 12.sp
                 )
                 Text(
+                    "Partidas com dados de gols esperados: ${partidasComGolsEsperados.size} de ${simulados.size}",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Média de gols esperados: ${"%.2f".format(java.util.Locale.US, mediaGolsEsperadosCasa)} casa x ${"%.2f".format(java.util.Locale.US, mediaGolsEsperadosFora)} fora",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Diferença média entre os times: ${"%.2f".format(java.util.Locale.US, diferencaMediaGolsEsperados)} gol",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Jogos com gols esperados separados por até 0,25: $jogosComGolsProximos",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
                     "Empate ficou até 5 pontos do favorito: $empatesAteCincoPontos",
                     color = Color.White,
                     fontSize = 12.sp
                 )
                 Text(
-                    "Se a média for razoável, mas o empate quase nunca liderar, vamos investigar o equilíbrio entre as probabilidades. Nenhum resultado será forçado artificialmente.",
+                    "Esses números mostram se o próprio cálculo de gols está criando desequilíbrio. Depois vamos calibrar com validação histórica, sem forçar resultados.",
                     color = Color.LightGray,
                     fontSize = 10.sp
                 )
