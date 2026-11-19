@@ -23,7 +23,7 @@ class LembreteJogoWorker(context: Context, params: WorkerParameters) : Worker(co
         val channel = "lembretes_jogos"
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(NotificationChannel(channel, "Lembretes de jogos", NotificationManager.IMPORTANCE_DEFAULT))
         val n = NotificationCompat.Builder(applicationContext, channel)
-            .setSmallIcon(applicationInfo.icon)
+            .setSmallIcon(applicationContext.applicationInfo.icon)
             .setContentTitle("Falta pouco para o jogo!")
             .setContentText("$casa x $fora começa em aproximadamente 30 minutos.")
             .setAutoCancel(true)
