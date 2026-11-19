@@ -299,6 +299,45 @@ fun TelaPalpites(
     val resultadoAjustadoTeste = if (validacaoTemporalDisponivel)
         acertosDixonNoGrupo(testeDixon, rhoEscolhido) else 0 to 0
 
+    // Laboratorio de mando de campo: testa reducoes graduais na media de gols
+    // esperada do mandante. Ajuste escolhido apenas no treino e avaliado no futuro.
+    fun avaliarFatorMandante(grupo: List<JSONObject>, fator: Double): Triple<Int, Int, Int> {
+        var acertos = 0
+        var empatesPrevistos = 0
+        var visitantesPrevistos = 0
+        grupo.forEach { partida ->
+            val p = MotorPalpites.probabilidadesComFatorMandante(
+                partida.optDouble("golsEsperadosCasa"),
+                partida.optDouble("golsEsperadosFora"),
+                fator
+            )
+            val previsto = when {
+                p.casa >= p.empate && p.casa >= p.fora -> "CASA"
+                p.empate >= p.fora -> "EMPATE"
+                else -> "FORA"
+            }
+            if (previsto == partida.optString("resultadoReal")) acertos++
+            if (previsto == "EMPATE") empatesPrevistos++
+            if (previsto == "FORA") visitantesPrevistos++
+        }
+        return Triple(acertos, empatesPrevistos, visitantesPrevistos)
+    }
+
+    val fatoresMandante = listOf(0.80, 0.85, 0.90, 0.95, 1.00)
+    val fatorMandanteEscolhido = if (validacaoTemporalDisponivel) {
+        fatoresMandante.map { fator ->
+            fator to avaliarFatorMandante(treinoDixon, fator)
+        }.maxWithOrNull(
+            compareBy<Pair<Double, Triple<Int, Int, Int>>> { (_, resultado) ->
+                if (treinoDixon.isNotEmpty()) resultado.first.toDouble() / treinoDixon.size else 0.0
+            }.thenBy { (fator, _) -> fator }
+        )?.first ?: 1.0
+    } else 1.0
+    val resultadoMandoBaseTeste = if (validacaoTemporalDisponivel)
+        avaliarFatorMandante(testeDixon, 1.0) else Triple(0, 0, 0)
+    val resultadoMandoAjustadoTeste = if (validacaoTemporalDisponivel)
+        avaliarFatorMandante(testeDixon, fatorMandanteEscolhido) else Triple(0, 0, 0)
+
     // Raio-X específico para entender por que o empate não é escolhido.
     val probabilidadesEmpate = simulados.map {
         probabilidade(it, "probEmpateExata", "probEmpate")
@@ -952,6 +991,43 @@ Row(
                         color = Color.LightGray,
                         fontSize = 11.sp
                     )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("LABORATÓRIO: VANTAGEM DO MANDANTE", color = corDestaque, fontWeight = FontWeight.Bold)
+                Text(
+                    "Testa reduzir a média de gols esperados da casa. O fator é escolhido no treino e conferido em jogos posteriores; não altera os palpites oficiais.",
+                    color = Color.LightGray,
+                    fontSize = 10.sp
+                )
+                if (validacaoTemporalDisponivel) {
+                    fatoresMandante.forEach { fator ->
+                        val resultado = avaliarFatorMandante(treinoDixon, fator)
+                        Text(
+                            "Fator ${"%.2f".format(java.util.Locale.US, fator)}: ${resultado.first}/${treinoDixon.size} acertos no treino • empates: ${resultado.second} • vitórias fora: ${resultado.third}",
+                            color = Color.White,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Text(
+                        "Melhor fator no treino: ${"%.2f".format(java.util.Locale.US, fatorMandanteEscolhido)}",
+                        color = corDestaque,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        "Teste futuro, modelo atual: ${resultadoMandoBaseTeste.first}/${testeDixon.size} acertos • empates: ${resultadoMandoBaseTeste.second} • fora: ${resultadoMandoBaseTeste.third}",
+                        color = Color.White,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        "Teste futuro, fator ajustado: ${resultadoMandoAjustadoTeste.first}/${testeDixon.size} acertos • empates: ${resultadoMandoAjustadoTeste.second} • fora: ${resultadoMandoAjustadoTeste.third}",
+                        color = corDestaque,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                } else {
+                    Text("Aguardando amostra suficiente para treino e teste temporal.", color = Color.LightGray, fontSize = 11.sp)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("RAIO-X DOS EMPATES", color = corDestaque, fontWeight = FontWeight.Bold)
