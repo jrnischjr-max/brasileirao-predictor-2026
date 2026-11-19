@@ -885,10 +885,12 @@ fun TelaPrincipal(
         .navigationBarsPadding()
 ) {
     
-        SelectionContainer {
+        SelectionContainer(
+            modifier = Modifier.weight(1f)
+        ) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(18.dp)
             ) {
