@@ -275,7 +275,7 @@ object MotorPalpites {
                 partida.fora.equals(nomeFora, true)) ||
             (partida.casa.equals(nomeFora, true) &&
                 partida.fora.equals(nomeCasa, true))
-        }.takeLast(5)
+        }.takeLast(10)
 
         if (confrontos.isEmpty()) return 1.0
 
@@ -438,7 +438,13 @@ object MotorPalpites {
             it.optString("nome").equals(nomeFora, true)
         } ?: return null
 
+        // Limita toda a base à data anterior ao jogo previsto.
+        // Isso impede vazamento de resultados futuros ao combinar várias temporadas.
+        val dataAlvo = jogo.optString("data").take(10)
+        if (dataAlvo.isBlank()) return null
+
         val partidas = partidasFinalizadas(todosJogos)
+            .filter { it.data.take(10).isNotBlank() && it.data.take(10) < dataAlvo }
 
         if (partidas.isEmpty()) return null
 
