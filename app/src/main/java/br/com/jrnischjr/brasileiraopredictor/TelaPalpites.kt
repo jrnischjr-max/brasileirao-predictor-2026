@@ -312,6 +312,113 @@ fun TelaPalpites(
         jogosDixonOrdenados.take(indiceSeparacao) else emptyList()
     val testeDixon = if (validacaoTemporalDisponivel)
         jogosDixonOrdenados.drop(indiceSeparacao) else emptyList()
+
+    // Experimento de empate contextual: combina equilíbrio dos gols esperados,
+    // baixo volume de gols e frequência de empates observada somente no treino.
+    val taxaEmpateHistoricaTreino = if (treinoDixon.isNotEmpty()) {
+        (treinoDixon.count { it.optString("resultadoReal") == "EMPATE" } + 5.4) /
+            (treinoDixon.size + 20.0) * 100.0
+    } else 27.0
+
+    fun probabilidadesEmpateContextual(
+        partida: JSONObject,
+        intensidade: Double
+    ): Triple<Double, Double, Double> {
+        val casaBase = probabilidade(partida, "probCasaExata", "probCasa")
+        val empateBase = probabilidade(partida, "probEmpateExata", "probEmpate")
+        val foraBase = probabilidade(partida, "probForaExata", "probFora")
+        val golsCasa = partida.optDouble("golsEsperadosCasa")
+        val golsFora = partida.optDouble("golsEsperadosFora")
+        val diferenca = kotlin.math.abs(golsCasa - golsFora)
+        val totalGols = golsCasa + golsFora
+        val equilibrio = kotlin.math.exp(-1.8 * diferenca)
+        val baixoVolume = 1.0 / (1.0 + kotlin.math.exp((totalGols - 2.4) * 1.5))
+        val alvoContextual = taxaEmpateHistoricaTreino * 0.40 +
+            (18.0 + 18.0 * equilibrio + 10.0 * baixoVolume) * 0.60
+        val empateNovo = (empateBase + intensidade * (alvoContextual - empateBase))
+            .coerceIn(5.0, 60.0)
+        val somaNaoEmpate = (casaBase + foraBase).coerceAtLeast(0.001)
+        val restante = 100.0 - empateNovo
+        return Triple(
+            restante * casaBase / somaNaoEmpate,
+            empateNovo,
+            restante * foraBase / somaNaoEmpate
+        )
+    }
+
+    fun avaliarEmpateContextual(grupo: List<JSONObject>, intensidade: Double): Triple<Int, Int, Int> {
+        var acertos = 0
+        var empatesPrevistos = 0
+        var empatesCertos = 0
+        grupo.forEach { partida ->
+            val p = probabilidadesEmpateContextual(partida, intensidade)
+            val previsto = when {
+                p.first >= p.second && p.first >= p.third -> "CASA"
+                p.second >= p.third -> "EMPATE"
+                else -> "FORA"
+            }
+            val real = partida.optString("resultadoReal")
+            if (previsto == real) acertos++
+            if (previsto == "EMPATE") {
+                empatesPrevistos++
+                if (real == "EMPATE") empatesCertos++
+            }
+        }
+        return Triple(acertos, empatesPrevistos, empatesCertos)
+    }
+
+    fun macroF1EmpateContextual(grupo: List<JSONObject>, intensidade: Double): Double {
+        if (grupo.isEmpty()) return 0.0
+        val classes = listOf("CASA", "EMPATE", "FORA")
+        return classes.map { classe ->
+            var tp = 0
+            var fp = 0
+            var fn = 0
+            grupo.forEach { partida ->
+                val p = probabilidadesEmpateContextual(partida, intensidade)
+                val previsto = when {
+                    p.first >= p.second && p.first >= p.third -> "CASA"
+                    p.second >= p.third -> "EMPATE"
+                    else -> "FORA"
+                }
+                val real = partida.optString("resultadoReal")
+                if (previsto == classe && real == classe) tp++
+                else if (previsto == classe) fp++
+                else if (real == classe) fn++
+            }
+            val precisao = tp.toDouble() / (tp + fp).coerceAtLeast(1)
+            val recall = tp.toDouble() / (tp + fn).coerceAtLeast(1)
+            if (precisao + recall == 0.0) 0.0 else 2.0 * precisao * recall / (precisao + recall)
+        }.average()
+    }
+
+    fun brierEmpateContextual(grupo: List<JSONObject>, intensidade: Double): Double {
+        if (grupo.isEmpty()) return 0.0
+        var soma = 0.0
+        grupo.forEach { partida ->
+            val p = probabilidadesEmpateContextual(partida, intensidade)
+            val real = partida.optString("resultadoReal")
+            val alvos = listOf(real == "CASA", real == "EMPATE", real == "FORA")
+            val valores = listOf(p.first, p.second, p.third)
+            soma += valores.indices.sumOf { i ->
+                val erro = valores[i] / 100.0 - if (alvos[i]) 1.0 else 0.0
+                erro * erro
+            }
+        }
+        return soma / grupo.size
+    }
+
+    val intensidadesEmpate = listOf(0.25, 0.50, 0.75, 1.0)
+    val intensidadeEmpateEscolhida = if (validacaoTemporalDisponivel) {
+        intensidadesEmpate.maxByOrNull { macroF1EmpateContextual(treinoDixon, it) } ?: 0.50
+    } else 0.50
+    val resultadoEmpateContextualTeste = if (validacaoTemporalDisponivel)
+        avaliarEmpateContextual(testeDixon, intensidadeEmpateEscolhida) else Triple(0, 0, 0)
+    val brierEmpateContextualTeste = if (validacaoTemporalDisponivel)
+        brierEmpateContextual(testeDixon, intensidadeEmpateEscolhida) else 0.0
+    val macroF1EmpateContextualTeste = if (validacaoTemporalDisponivel)
+        macroF1EmpateContextual(testeDixon, intensidadeEmpateEscolhida) else 0.0
+
     val rhoEscolhido = if (validacaoTemporalDisponivel) {
         listOf(0.0, -0.05, -0.10, -0.15, -0.20, -0.25)
             .map { rho -> rho to acertosDixonNoGrupo(treinoDixon, rho) }
@@ -636,6 +743,12 @@ fun TelaPalpites(
         appendLine("Treino: ${treinoDixon.size} jogos • Teste futuro: ${testeDixon.size} jogos")
         appendLine("Modelo original no teste: ${resultadoBaseTeste.first}/${resultadoBaseTeste.second}")
         appendLine("Modelo experimental no teste: ${resultadoAjustadoTeste.first}/${resultadoAjustadoTeste.second}")
+        appendLine("EXPERIMENTO: EMPATE CONTEXTUAL (TREINO SOMENTE)")
+        appendLine("Sinais: equilíbrio dos gols esperados + baixo total de gols + frequência histórica de empates.")
+        appendLine("Frequência histórica suavizada no treino: ${"%.1f".format(java.util.Locale.US, taxaEmpateHistoricaTreino)}%")
+        appendLine("Intensidade escolhida por Macro-F1 no treino: ${"%.2f".format(java.util.Locale.US, intensidadeEmpateEscolhida)}")
+        appendLine("Teste futuro: ${resultadoEmpateContextualTeste.first}/${testeDixon.size} • empates previstos: ${resultadoEmpateContextualTeste.second} • empates certos: ${resultadoEmpateContextualTeste.third}")
+        appendLine("Macro-F1 contextual: ${"%.1f".format(java.util.Locale.US, macroF1EmpateContextualTeste * 100)}% • Brier: ${"%.4f".format(java.util.Locale.US, brierEmpateContextualTeste)}")
         appendLine("COMPARAÇÃO DE MODELOS NO MESMO TESTE FUTURO")
         appendLine("Motor atual: ${avaliacaoAtualTeste.first}/${avaliacaoAtualTeste.second} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoAtualTeste.third)}")
         appendLine("Elo: ${avaliacaoEloTeste.first}/${avaliacaoEloTeste.second} • Brier ${"%.4f".format(java.util.Locale.US, avaliacaoEloTeste.third)}")
