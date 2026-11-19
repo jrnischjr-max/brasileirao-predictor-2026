@@ -622,6 +622,7 @@ fun TelaPrincipal(nome: String, time: String) {
     var abaSelecionada by remember { mutableStateOf("Início") }
     var carregandoJogos by remember { mutableStateOf(false) }
     var erroJogos by remember { mutableStateOf("") }
+    var ultimaAtualizacaoJogos by remember { mutableStateOf<String?>(null) }
     var rodadaSelecionada by remember { mutableStateOf<Int?>(null) }
     var menuRodadasAberto by remember { mutableStateOf(false) }
 
