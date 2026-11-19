@@ -812,6 +812,12 @@ fun TelaPrincipal(
                     }
                 }
 
+                jogos.forEach { jogo ->
+                    val casa = jogo.optJSONObject("mandante")?.optString("nome", "Mandante") ?: "Mandante"
+                    val fora = jogo.optJSONObject("visitante")?.optString("nome", "Visitante") ?: "Visitante"
+                    AgendadorNotificacoes.agendar(context, jogo.optString("id", "$casa-$fora-${jogo.optString("data")}"), casa, fora, jogo.optString("data"))
+                }
+
                 if (jogos.isEmpty()) {
                     erroJogos = "Nenhum jogo foi encontrado."
                 } else {
