@@ -60,14 +60,25 @@ fun PredictorApp() {
                     .getResult(ApiException::class.java)
                 val usuario = auth.currentUser
 
+                val credencial = GoogleAuthProvider.getCredential(conta.idToken, null)
+
                 if (usuario == null) {
-                    mensagemGoogle = "Entre primeiro com seu e-mail e senha."
+                    // O Google já foi vinculado à conta existente.
+                    // O Firebase autentica o mesmo UID, preservando o histórico.
+                    auth.signInWithCredential(credencial)
+                        .addOnSuccessListener {
+                            mensagemGoogle = "Login com Google realizado! Bem-vindo de volta. ✅"
+                            usuarioLogado = true
+                            biometriaLiberada = false
+                        }
+                        .addOnFailureListener { erro ->
+                            mensagemGoogle = "Não foi possível entrar com Google: ${erro.localizedMessage ?: "tente novamente."}"
+                        }
                 } else if (!conta.email.equals(usuario.email, ignoreCase = true)) {
                     mensagemGoogle = "Escolha a mesma conta Google do seu cadastro: ${usuario.email}."
                 } else if (usuario.providerData.any { it.providerId == "google.com" }) {
                     mensagemGoogle = "Sua conta Google já está vinculada."
                 } else {
-                    val credencial = GoogleAuthProvider.getCredential(conta.idToken, null)
                     usuario.linkWithCredential(credencial)
                         .addOnSuccessListener {
                             mensagemGoogle = "Conta Google vinculada com sucesso! Seu histórico foi preservado. ✅"
@@ -636,6 +647,28 @@ fun PredictorApp() {
                                 else if (cadastro) "CRIAR MINHA CONTA"
                                 else "ENTRAR"
                             )
+                        }
+
+                        if (!cadastro) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    mensagem = ""
+                                    mensagemGoogle = ""
+                                    vincularGoogle()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !carregando
+                            ) {
+                                Text("ENTRAR COM GOOGLE")
+                            }
+                            if (mensagemGoogle.isNotBlank()) {
+                                Text(
+                                    mensagemGoogle,
+                                    color = Color.DarkGray,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            }
                         }
 
                         TextButton(
