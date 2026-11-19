@@ -1,10 +1,13 @@
 package br.com.jrnischjr.brasileiraopredictor
 
+import android.app.Activity
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
@@ -23,7 +26,11 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 
@@ -42,6 +49,55 @@ fun PredictorApp() {
     val db = remember { FirebaseFirestore.getInstance() }
     val context = LocalContext.current
     val activity = context as? FragmentActivity
+    var mensagemGoogle by remember { mutableStateOf("") }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { resultado ->
+        if (resultado.resultCode == Activity.RESULT_OK) {
+            try {
+                val conta = GoogleSignIn.getSignedInAccountFromIntent(resultado.data)
+                    .getResult(ApiException::class.java)
+                val usuario = auth.currentUser
+
+                if (usuario == null) {
+                    mensagemGoogle = "Entre primeiro com seu e-mail e senha."
+                } else if (!conta.email.equals(usuario.email, ignoreCase = true)) {
+                    mensagemGoogle = "Escolha a mesma conta Google do seu cadastro: ${usuario.email}."
+                } else if (usuario.providerData.any { it.providerId == "google.com" }) {
+                    mensagemGoogle = "Sua conta Google já está vinculada."
+                } else {
+                    val credencial = GoogleAuthProvider.getCredential(conta.idToken, null)
+                    usuario.linkWithCredential(credencial)
+                        .addOnSuccessListener {
+                            mensagemGoogle = "Conta Google vinculada com sucesso! Seu histórico foi preservado. ✅"
+                        }
+                        .addOnFailureListener { erro ->
+                            mensagemGoogle = when (erro) {
+                                is com.google.firebase.auth.FirebaseAuthUserCollisionException ->
+                                    "Esta conta Google já está vinculada a outro usuário."
+                                else -> "Não foi possível vincular: ${erro.localizedMessage ?: "tente novamente."}"
+                            }
+                        }
+                }
+            } catch (erro: ApiException) {
+                mensagemGoogle = "Login Google cancelado ou indisponível (código ${erro.statusCode})."
+            } catch (erro: Exception) {
+                mensagemGoogle = "Erro ao selecionar a conta Google: ${erro.localizedMessage ?: "tente novamente."}"
+            }
+        }
+    }
+
+    val vincularGoogle: () -> Unit = {
+        val opcoes = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken("225614080330-nntuemb7tcurafgglidhoe0h3mlvrmr8.apps.googleusercontent.com")
+            .requestEmail()
+            .build()
+        val cliente = GoogleSignIn.getClient(context, opcoes)
+        cliente.signOut().addOnCompleteListener {
+            googleSignInLauncher.launch(cliente.signInIntent)
+        }
+    }
 
     val preferencias = remember {
         context.getSharedPreferences(
@@ -257,7 +313,10 @@ fun PredictorApp() {
                 TelaPrincipal(
                     nome = nomeUsuario,
                     time = time,
-                    uid = auth.currentUser?.uid.orEmpty()
+                    uid = auth.currentUser?.uid.orEmpty(),
+                    emailGoogleVinculado = auth.currentUser?.providerData?.any { it.providerId == "google.com" } == true,
+                    mensagemGoogle = mensagemGoogle,
+                    onVincularGoogle = vincularGoogle
                 )
             }
         } else if (usuarioLogado) {
@@ -619,7 +678,14 @@ fun PredictorApp() {
 
    
 @Composable
-fun TelaPrincipal(nome: String, time: String, uid: String) {
+fun TelaPrincipal(
+    nome: String,
+    time: String,
+    uid: String,
+    emailGoogleVinculado: Boolean,
+    mensagemGoogle: String,
+    onVincularGoogle: () -> Unit
+) {
     var abaSelecionada by remember { mutableStateOf("Início") }
     var carregandoJogos by remember { mutableStateOf(false) }
     var erroJogos by remember { mutableStateOf("") }
@@ -819,6 +885,40 @@ fun TelaPrincipal(nome: String, time: String, uid: String) {
                                 fontSize = 25.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = corCartao)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                if (emailGoogleVinculado) "CONTA GOOGLE VINCULADA ✅" else "PROTEJA SEU ACESSO",
+                                color = corDestaque,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                if (emailGoogleVinculado)
+                                    "Sua conta Google está conectada ao mesmo perfil e histórico."
+                                else
+                                    "Vincule o Google à sua conta atual para facilitar os próximos acessos sem perder seus palpites.",
+                                color = Color.White,
+                                fontSize = 13.sp
+                            )
+                            if (!emailGoogleVinculado) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(onClick = onVincularGoogle) {
+                                    Text("VINCULAR CONTA GOOGLE")
+                                }
+                            }
+                            if (mensagemGoogle.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(mensagemGoogle, color = Color.White, fontSize = 12.sp)
+                            }
                         }
                     }
 
