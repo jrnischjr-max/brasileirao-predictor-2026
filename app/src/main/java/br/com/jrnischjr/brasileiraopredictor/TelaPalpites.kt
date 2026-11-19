@@ -29,6 +29,7 @@ fun TelaPalpites(
     var historicoCarregando by remember { mutableStateOf(true) }
     var erroHistorico by remember { mutableStateOf("") }
     var salvandoPalpite by remember { mutableStateOf(false) }
+    var simulandoHistorico by remember { mutableStateOf(false) }
 
     var rodadaSelecionada by remember { mutableStateOf(0) }
     var rodadaMenuAberto by remember { mutableStateOf(false) }
@@ -187,8 +188,19 @@ fun TelaPalpites(
         .sortedBy { it.optString("data") }
 
     val finalizados = historico.filter {
-        it.optBoolean("finalizado")
+        it.optBoolean("finalizado") &&
+            it.optString("origem") != "SIMULACAO_HISTORICA"
     }
+
+    val simulados = historico.filter {
+        it.optBoolean("finalizado") &&
+            it.optString("origem") == "SIMULACAO_HISTORICA"
+    }
+
+    val acertosSimulados = simulados.count { it.optBoolean("acertouResultado") }
+    val taxaSimulada = if (simulados.isNotEmpty()) {
+        (acertosSimulados * 100) / simulados.size
+    } else 0
 
     // Acerto de resultado significa acertar Casa/Empate/Fora (1X2).
     val acertos = finalizados.count {
@@ -645,6 +657,46 @@ Row(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = corCartao)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text("SIMULAÇÃO HISTÓRICA (SEPARADA)", color = corDestaque, fontWeight = FontWeight.Bold)
+                Text(
+                    "Partidas simuladas: ${simulados.size} • Acertos 1X2: $acertosSimulados • Taxa: $taxaSimulada%",
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        simulandoHistorico = true
+                        HistoricoPalpitesNuvem.gerarSimulacaoHistorica(uid, jogos.toList()) { quantidade, mensagem ->
+                            simulandoHistorico = false
+                            if (mensagem != null) {
+                                erroHistorico = mensagem
+                            } else {
+                                carregarHistorico()
+                                erroHistorico = "Simulação concluída: $quantidade novos jogos adicionados."
+                            }
+                        }
+                    },
+                    enabled = !simulandoHistorico && uid.isNotBlank() && jogosProntos,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (simulandoHistorico) "GERANDO SIMULAÇÃO..." else "GERAR SIMULAÇÃO HISTÓRICA")
+                }
+                Text(
+                    "Executa somente partidas finalizadas ainda não registradas. Não altera seus palpites reais.",
+                    color = Color.LightGray,
+                    fontSize = 10.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         historico.sortedByDescending {
             it.optString("data")
         }.forEach { palpite ->
@@ -664,6 +716,16 @@ Row(
                     Text(
                         "${palpite.optString("mandante")} x ${palpite.optString("visitante")}",
                         color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        if (palpite.optString("origem") == "SIMULACAO_HISTORICA")
+                            "SIMULAÇÃO RETROSPECTIVA"
+                        else
+                            "PALPITE REAL",
+                        color = corDestaque,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
 
