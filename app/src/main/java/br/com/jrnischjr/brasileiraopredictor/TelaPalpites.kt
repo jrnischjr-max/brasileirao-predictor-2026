@@ -365,18 +365,98 @@ fun TelaPalpites(
     }
 
     val limiaresEmpate = listOf(0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00)
+
+    fun macroF1(grupo: List<JSONObject>, limiar: Double): Double {
+        if (grupo.isEmpty()) return 0.0
+        val classes = listOf("CASA", "EMPATE", "FORA")
+        val f1s = classes.map { classe ->
+            var verdadeirosPositivos = 0
+            var falsosPositivos = 0
+            var falsosNegativos = 0
+            grupo.forEach { partida ->
+                val pCasa = probabilidade(partida, "probCasaExata", "probCasa")
+                val pEmpate = probabilidade(partida, "probEmpateExata", "probEmpate")
+                val pFora = probabilidade(partida, "probForaExata", "probFora")
+                val maiorRival = maxOf(pCasa, pFora)
+                val previsto = if (pEmpate >= maiorRival * limiar) "EMPATE"
+                    else if (pCasa >= pFora) "CASA" else "FORA"
+                val real = partida.optString("resultadoReal")
+                if (previsto == classe && real == classe) verdadeirosPositivos++
+                else if (previsto == classe) falsosPositivos++
+                else if (real == classe) falsosNegativos++
+            }
+            val precisao = verdadeirosPositivos.toDouble() /
+                (verdadeirosPositivos + falsosPositivos).coerceAtLeast(1)
+            val recall = verdadeirosPositivos.toDouble() /
+                (verdadeirosPositivos + falsosNegativos).coerceAtLeast(1)
+            if (precisao + recall == 0.0) 0.0 else 2.0 * precisao * recall / (precisao + recall)
+        }
+        return f1s.average()
+    }
+
+    fun relatorioMetricas(grupo: List<JSONObject>, limiar: Double): String {
+        if (grupo.isEmpty()) return "Sem amostra para métricas avançadas."
+        val classes = listOf("CASA", "EMPATE", "FORA")
+        val nomes = listOf("Casa", "Empate", "Fora")
+        val linhas = classes.indices.map { indice ->
+            val classe = classes[indice]
+            var tp = 0
+            var fp = 0
+            var fn = 0
+            grupo.forEach { partida ->
+                val pCasa = probabilidade(partida, "probCasaExata", "probCasa")
+                val pEmpate = probabilidade(partida, "probEmpateExata", "probEmpate")
+                val pFora = probabilidade(partida, "probForaExata", "probFora")
+                val previsto = if (pEmpate >= maxOf(pCasa, pFora) * limiar) "EMPATE"
+                    else if (pCasa >= pFora) "CASA" else "FORA"
+                val real = partida.optString("resultadoReal")
+                if (previsto == classe && real == classe) tp++
+                else if (previsto == classe) fp++
+                else if (real == classe) fn++
+            }
+            val precisao = tp.toDouble() / (tp + fp).coerceAtLeast(1)
+            val recall = tp.toDouble() / (tp + fn).coerceAtLeast(1)
+            val f1 = if (precisao + recall > 0) 2 * precisao * recall / (precisao + recall) else 0.0
+            "${nomes[indice]}: precisão ${"%.1f".format(java.util.Locale.US, precisao * 100)}% • recall ${"%.1f".format(java.util.Locale.US, recall * 100)}% • F1 ${"%.1f".format(java.util.Locale.US, f1 * 100)}%"
+        }
+        var brier = 0.0
+        grupo.forEach { partida ->
+            val probabilidades = listOf(
+                probabilidade(partida, "probCasaExata", "probCasa") / 100.0,
+                probabilidade(partida, "probEmpateExata", "probEmpate") / 100.0,
+                probabilidade(partida, "probForaExata", "probFora") / 100.0
+            )
+            val real = partida.optString("resultadoReal")
+            val alvos = listOf(real == "CASA", real == "EMPATE", real == "FORA")
+            brier += probabilidades.indices.sumOf { i ->
+                val erro = probabilidades[i] - if (alvos[i]) 1.0 else 0.0
+                erro * erro
+            }
+        }
+        brier /= grupo.size
+        return linhas.joinToString("\\n") +
+            "\\nMacro-F1: ${"%.1f".format(java.util.Locale.US, macroF1(grupo, limiar) * 100)}%" +
+            "\\nBrier multiclasses (menor é melhor): ${"%.4f".format(java.util.Locale.US, brier)}"
+    }
+
+    // O limiar agora é escolhido pelo Macro-F1 no treino, equilibrando casa,
+    // empate e visitante. A acurácia continua sendo reportada, mas não decide sozinha.
     val limiarEmpateEscolhido = if (validacaoTemporalDisponivel) {
-        limiaresEmpate.map { limiar -> limiar to avaliarLimiarEmpate(treinoDixon, limiar) }
+        limiaresEmpate.map { limiar -> limiar to macroF1(treinoDixon, limiar) }
             .maxWithOrNull(
-                compareBy<Pair<Double, Triple<Int, Int, Int>>> { (_, resultado) ->
-                    if (treinoDixon.isNotEmpty()) resultado.first.toDouble() / treinoDixon.size else 0.0
-                }.thenBy { (limiar, _) -> limiar }
+                compareBy<Pair<Double, Double>> { it.second }
+                    .thenBy { limiar -> avaliarLimiarEmpate(treinoDixon, limiar.first).first }
+                    .thenBy { it.first }
             )?.first ?: 1.0
     } else 1.0
     val resultadoEmpateBaseTreino = if (validacaoTemporalDisponivel) avaliarLimiarEmpate(treinoDixon, 1.0) else Triple(0, 0, 0)
     val resultadoEmpateAjustadoTreino = if (validacaoTemporalDisponivel) avaliarLimiarEmpate(treinoDixon, limiarEmpateEscolhido) else Triple(0, 0, 0)
     val resultadoEmpateBaseTeste = if (validacaoTemporalDisponivel) avaliarLimiarEmpate(testeDixon, 1.0) else Triple(0, 0, 0)
     val resultadoEmpateAjustadoTeste = if (validacaoTemporalDisponivel) avaliarLimiarEmpate(testeDixon, limiarEmpateEscolhido) else Triple(0, 0, 0)
+    val metricasBaseTreino = relatorioMetricas(treinoDixon, 1.0)
+    val metricasAjustadasTreino = relatorioMetricas(treinoDixon, limiarEmpateEscolhido)
+    val metricasBaseTeste = relatorioMetricas(testeDixon, 1.0)
+    val metricasAjustadasTeste = relatorioMetricas(testeDixon, limiarEmpateEscolhido)
 
     // Raio-X específico para entender por que o empate não é escolhido.
     val probabilidadesEmpate = simulados.map {
@@ -509,6 +589,16 @@ fun TelaPalpites(
         appendLine("Treino, modelo atual: ${resultadoEmpateBaseTreino.first}/${treinoDixon.size} • ajustado: ${resultadoEmpateAjustadoTreino.first}/${treinoDixon.size}")
         appendLine("Teste futuro, modelo atual: ${resultadoEmpateBaseTeste.first}/${testeDixon.size} • empates: ${resultadoEmpateBaseTeste.second} • certos: ${resultadoEmpateBaseTeste.third}")
         appendLine("Teste futuro, limiar ajustado: ${resultadoEmpateAjustadoTeste.first}/${testeDixon.size} • empates: ${resultadoEmpateAjustadoTeste.second} • certos: ${resultadoEmpateAjustadoTeste.third}")
+        appendLine("CALIBRAÇÃO AVANÇADA: PRECISÃO, RECALL, F1 E BRIER")
+        appendLine("Limiar escolhido por Macro-F1 no treino: ${"%.2f".format(java.util.Locale.US, limiarEmpateEscolhido)}")
+        appendLine("MÉTRICAS NO TESTE FUTURO - MODELO ORIGINAL")
+        appendLine(metricasBaseTeste)
+        appendLine("MÉTRICAS NO TESTE FUTURO - LIMIAR CALIBRADO")
+        appendLine(metricasAjustadasTeste)
+        appendLine("MÉTRICAS DE TREINO - MODELO ORIGINAL")
+        appendLine(metricasBaseTreino)
+        appendLine("MÉTRICAS DE TREINO - LIMIAR CALIBRADO")
+        appendLine(metricasAjustadasTreino)
         appendLine("RAIO-X DOS EMPATES")
         appendLine("Partidas analisadas: ${probabilidadesEmpate.size} de ${simulados.size}")
         appendLine("Empates escolhidos pelo motor: ${simuladosEmpate.size}")
@@ -1152,6 +1242,11 @@ Row(
                     Text("Treino, modelo atual: ${resultadoEmpateBaseTreino.first}/${treinoDixon.size} • ajustado: ${resultadoEmpateAjustadoTreino.first}/${treinoDixon.size}", color = Color.White, fontSize = 11.sp)
                     Text("Teste futuro, modelo atual: ${resultadoEmpateBaseTeste.first}/${testeDixon.size} acertos • empates: ${resultadoEmpateBaseTeste.second} • certos: ${resultadoEmpateBaseTeste.third}", color = Color.White, fontSize = 11.sp)
                     Text("Teste futuro, limiar ajustado: ${resultadoEmpateAjustadoTeste.first}/${testeDixon.size} acertos • empates: ${resultadoEmpateAjustadoTeste.second} • certos: ${resultadoEmpateAjustadoTeste.third}", color = corDestaque, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("MÉTRICAS AVANÇADAS NO TESTE FUTURO", color = corDestaque, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text("Modelo original:\\n$metricasBaseTeste", color = Color.White, fontSize = 10.sp)
+                    Text("Limiar calibrado (\\${"%.2f".format(java.util.Locale.US, limiarEmpateEscolhido)}):\\n$metricasAjustadasTeste", color = Color.White, fontSize = 10.sp)
+                    Text("Seleção por Macro-F1 equilibra as três classes. Brier menor indica probabilidades melhores calibradas.", color = Color.LightGray, fontSize = 10.sp)
                 } else {
                     Text("Aguardando amostra suficiente para treino e teste temporal.", color = Color.LightGray, fontSize = 11.sp)
                 }
