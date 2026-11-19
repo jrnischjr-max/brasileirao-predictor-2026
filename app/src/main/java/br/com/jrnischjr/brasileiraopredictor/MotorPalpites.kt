@@ -89,6 +89,39 @@ object MotorPalpites {
         return resultado
     }
 
+    // Experimento de calibracao do mando: altera somente a media de gols da casa.
+    // Mantem o modelo Poisson independente e nao modifica os palpites oficiais.
+    fun probabilidadesComFatorMandante(
+        mediaCasa: Double,
+        mediaFora: Double,
+        fatorMandante: Double
+    ): Probabilidades1X2 {
+        val casaAjustada = (mediaCasa * fatorMandante).coerceIn(0.05, 5.0)
+        var casa = 0.0
+        var empate = 0.0
+        var fora = 0.0
+
+        for (gCasa in 0..10) {
+            for (gFora in 0..10) {
+                val chance = poisson(casaAjustada, gCasa) *
+                    poisson(mediaFora, gFora)
+                when {
+                    gCasa > gFora -> casa += chance
+                    gCasa == gFora -> empate += chance
+                    else -> fora += chance
+                }
+            }
+        }
+
+        val total = casa + empate + fora
+        if (total <= 0.0) return Probabilidades1X2(0.0, 0.0, 0.0)
+        return Probabilidades1X2(
+            casa = casa / total * 100.0,
+            empate = empate / total * 100.0,
+            fora = fora / total * 100.0
+        )
+    }
+
     // Dixon-Coles: ajusta apenas os quatro placares baixos,
     // preservando as médias de gols e normalizando as probabilidades.
     fun probabilidadesDixonColes(
