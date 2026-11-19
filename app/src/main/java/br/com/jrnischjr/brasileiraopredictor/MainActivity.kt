@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -884,12 +885,13 @@ fun TelaPrincipal(
         .navigationBarsPadding()
 ) {
     
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(18.dp)
-        ) {
+        SelectionContainer {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(18.dp)
+            ) {
             Text(
                 "BRASILEIRÃO",
                 color = Color.White,
@@ -1258,6 +1260,7 @@ Row(
                     )
                 }
             }
+        }
         }
 
         Row(
