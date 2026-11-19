@@ -868,21 +868,21 @@ fun TelaPrincipal(
         it.optString("rodada").toIntOrNull() == rodadaSelecionada
     }
 
-    LaunchedEffect(abaSelecionada) {
-    if (abaSelecionada == "Jogos") {
-
+    // Carrega o calendário ao entrar na área autenticada, sem depender da aba Jogos.
+    // O WorkManager mantém os lembretes mesmo se o processo for encerrado ou o aparelho reiniciar.
+    LaunchedEffect(Unit) {
         if (jogos.isEmpty() && !carregandoJogos) {
             carregarJogos()
         }
 
+        // Atualiza o calendário periodicamente sem consultar a API a cada minuto.
         while (true) {
-            delay(60_000)
+            delay(6 * 60 * 60 * 1000L)
             if (!carregandoJogos) {
                 carregarJogos()
             }
         }
     }
-}
     Column(
     modifier = Modifier
         .fillMaxSize()
