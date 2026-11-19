@@ -24,8 +24,24 @@ jobs:
         with:
           gradle-version: 8.9
 
-      - name: Compilar aplicativo
-        run: gradle :app:assembleDebug
+      - name: Preparar chave de assinatura
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || (echo "Secret KEYSTORE_BASE64 não configurado" && exit 1)
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/brasileirao-release.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/brasileirao-release.jks" >> "$GITHUB_ENV"
+
+      - name: Compilar aplicativo assinado
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_PASSWORD" || (echo "Secret KEYSTORE_PASSWORD não configurado" && exit 1)
+          test -n "$KEY_ALIAS" || (echo "Secret KEY_ALIAS não configurado" && exit 1)
+          test -n "$KEY_PASSWORD" || (echo "Secret KEY_PASSWORD não configurado" && exit 1)
+          gradle :app:assembleDebug
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
