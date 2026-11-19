@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -773,6 +774,10 @@ fun TelaPrincipal(
 
     val abas = listOf("Início", "Jogos", "Tabela", "Palpites")
 
+    BackHandler(enabled = abaSelecionada != "Início") {
+        abaSelecionada = "Início"
+    }
+
     fun formatarDataBrasil(dataUtc: String): String {
         return try {
             if (dataUtc.length < 19) {
@@ -885,15 +890,15 @@ fun TelaPrincipal(
         .navigationBarsPadding()
 ) {
     
-        SelectionContainer(
-            modifier = Modifier.weight(1f)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(18.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(18.dp)
-            ) {
+            SelectionContainer {
+                Column {
             Text(
                 "BRASILEIRÃO",
                 color = Color.White,
@@ -1261,6 +1266,7 @@ Row(
                         uid = uid
                     )
                 }
+            }
             }
         }
         }
