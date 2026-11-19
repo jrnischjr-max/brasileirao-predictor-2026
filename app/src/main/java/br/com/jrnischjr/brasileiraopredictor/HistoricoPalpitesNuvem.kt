@@ -348,6 +348,10 @@ object HistoricoPalpitesNuvem {
                         val acertouPlacarAnterior = palpite.optBoolean("acertouPlacar")
                         val usuarioAcertouResultadoAnterior = palpite.optBoolean("usuarioAcertouResultado")
                         val usuarioAcertouPlacarAnterior = palpite.optBoolean("usuarioAcertouPlacar")
+                        val tinhaMetricasUsuario = !palpite.has("usuarioPlacarCasa") ||
+                            (palpite.has("usuarioResultadoReal") &&
+                                palpite.has("usuarioAcertouResultado") &&
+                                palpite.has("usuarioAcertouPlacar"))
                         val tinhaMetricas = palpite.has("resultadoReal") &&
                             palpite.has("acertouResultado") &&
                             palpite.has("acertouPlacar")
@@ -356,6 +360,7 @@ object HistoricoPalpitesNuvem {
 
                         val precisaSalvar = !jaEstavaFinalizado ||
                             !tinhaMetricas ||
+                            !tinhaMetricasUsuario ||
                             resultadoAnterior != palpite.optString("resultadoReal") ||
                             acertouResultadoAnterior != palpite.optBoolean("acertouResultado") ||
                             acertouPlacarAnterior != palpite.optBoolean("acertouPlacar") ||
@@ -395,13 +400,7 @@ object HistoricoPalpitesNuvem {
     private fun avaliar(palpite: JSONObject) {
         val golsCasa = palpite.optInt("golsReaisCasa", -1)
         val golsFora = palpite.optInt("golsReaisFora", -1)
-        val previstoCasa = palpite.optInt("placarCasa", -1)
-        val previstoFora = palpite.optInt("placarFora", -1)
-
-        if (
-            golsCasa < 0 || golsFora < 0 ||
-            previstoCasa < 0 || previstoFora < 0
-        ) return
+        if (golsCasa < 0 || golsFora < 0) return
 
         val resultadoReal = when {
             golsCasa > golsFora -> "CASA"
@@ -409,33 +408,35 @@ object HistoricoPalpitesNuvem {
             else -> "EMPATE"
         }
 
-        val temProbabilidades = palpite.has("probCasa") &&
-            palpite.has("probEmpate") && palpite.has("probFora")
-        val resultadoPrevisto = if (temProbabilidades) {
-            val probCasa = palpite.optDouble("probCasaExata", palpite.optDouble("probCasa"))
-            val probEmpate = palpite.optDouble("probEmpateExata", palpite.optDouble("probEmpate"))
-            val probFora = palpite.optDouble("probForaExata", palpite.optDouble("probFora"))
-            when {
-                probCasa >= probEmpate && probCasa >= probFora -> "CASA"
-                probEmpate >= probFora -> "EMPATE"
-                else -> "FORA"
+        // Avalia o palpite do motor somente quando ele existe no documento.
+        val previstoCasa = palpite.optInt("placarCasa", -1)
+        val previstoFora = palpite.optInt("placarFora", -1)
+        if (previstoCasa >= 0 && previstoFora >= 0) {
+            val temProbabilidades = palpite.has("probCasa") &&
+                palpite.has("probEmpate") && palpite.has("probFora")
+            val resultadoPrevisto = if (temProbabilidades) {
+                val probCasa = palpite.optDouble("probCasaExata", palpite.optDouble("probCasa"))
+                val probEmpate = palpite.optDouble("probEmpateExata", palpite.optDouble("probEmpate"))
+                val probFora = palpite.optDouble("probForaExata", palpite.optDouble("probFora"))
+                when {
+                    probCasa >= probEmpate && probCasa >= probFora -> "CASA"
+                    probEmpate >= probFora -> "EMPATE"
+                    else -> "FORA"
+                }
+            } else {
+                when {
+                    previstoCasa > previstoFora -> "CASA"
+                    previstoCasa < previstoFora -> "FORA"
+                    else -> "EMPATE"
+                }
             }
-        } else {
-            when {
-                previstoCasa > previstoFora -> "CASA"
-                previstoCasa < previstoFora -> "FORA"
-                else -> "EMPATE"
-            }
+            palpite.put("resultadoPrevisto", resultadoPrevisto)
+            palpite.put("resultadoReal", resultadoReal)
+            palpite.put("acertouResultado", resultadoPrevisto == resultadoReal)
+            palpite.put("acertouPlacar", previstoCasa == golsCasa && previstoFora == golsFora)
         }
 
-        palpite.put("resultadoPrevisto", resultadoPrevisto)
-        palpite.put("resultadoReal", resultadoReal)
-        palpite.put("acertouResultado", resultadoPrevisto == resultadoReal)
-        palpite.put(
-            "acertouPlacar",
-            previstoCasa == golsCasa && previstoFora == golsFora
-        )
-
+        // Avalia de forma independente o palpite digitado pelo usuário.
         if (palpite.has("usuarioPlacarCasa") && palpite.has("usuarioPlacarFora")) {
             val usuarioCasa = palpite.optInt("usuarioPlacarCasa", -1)
             val usuarioFora = palpite.optInt("usuarioPlacarFora", -1)
