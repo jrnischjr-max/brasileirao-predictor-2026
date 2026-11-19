@@ -101,13 +101,15 @@ object HistoricoPalpitesNuvem {
 
                 val atualizados = mutableListOf<JSONObject>()
                 val lote = db.batch()
+                var houveAtualizacao = false
 
                 documentos.documents.forEach { documento ->
 
                     val dados = documento.data ?: return@forEach
                     val palpite = JSONObject(dados)
+                    val jaEstavaFinalizado = palpite.optBoolean("finalizado")
 
-                    if (!palpite.optBoolean("finalizado")) {
+                    if (!jaEstavaFinalizado) {
 
                         val id = palpite.optString("idJogo")
 
@@ -152,7 +154,7 @@ object HistoricoPalpitesNuvem {
                         }
                     }
 
-                    if (palpite.optBoolean("finalizado")) {
+                    if (!jaEstavaFinalizado && palpite.optBoolean("finalizado")) {
                         avaliar(palpite)
 
                         lote.set(
@@ -160,18 +162,23 @@ object HistoricoPalpitesNuvem {
                             palpite.toMap(),
                             SetOptions.merge()
                         )
+                        houveAtualizacao = true
                     }
 
                     atualizados.add(palpite)
                 }
 
-                lote.commit()
-                    .addOnSuccessListener {
-                        callback(atualizados, null)
-                    }
-                    .addOnFailureListener { erro ->
-                        callback(null, erro.message ?: "Erro ao atualizar histórico.")
-                    }
+                if (!houveAtualizacao) {
+                    callback(atualizados, null)
+                } else {
+                    lote.commit()
+                        .addOnSuccessListener {
+                            callback(atualizados, null)
+                        }
+                        .addOnFailureListener { erro ->
+                            callback(null, erro.message ?: "Erro ao atualizar histórico.")
+                        }
+                }
             }
             .addOnFailureListener { erro ->
                 callback(null, erro.message ?: "Erro ao consultar histórico.")
