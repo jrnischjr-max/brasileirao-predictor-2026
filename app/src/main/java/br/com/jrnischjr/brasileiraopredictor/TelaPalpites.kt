@@ -190,12 +190,24 @@ fun TelaPalpites(
         it.optBoolean("finalizado")
     }
 
+    // Acerto de resultado significa acertar Casa/Empate/Fora (1X2).
     val acertos = finalizados.count {
         it.optBoolean("acertouResultado")
     }
 
     val taxaAcerto = if (finalizados.isNotEmpty()) {
         (acertos * 100) / finalizados.size
+    } else {
+        0
+    }
+
+    // Placar exato é uma métrica independente e mais rigorosa.
+    val acertosPlacar = finalizados.count {
+        it.optBoolean("acertouPlacar")
+    }
+
+    val taxaPlacar = if (finalizados.isNotEmpty()) {
+        (acertosPlacar * 100) / finalizados.size
     } else {
         0
     }
@@ -594,23 +606,39 @@ Row(
                 )
 
                 Text(
-                    "RESULTADOS ACERTADOS: $acertos",
-                    color = corDestaque,
+                    "ACERTO DO RESULTADO (1X2): $acertos de ${finalizados.size}",
+                    color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    fontSize = 14.sp
                 )
 
                 Text(
-                    "TAXA DE ACERTO: $taxaAcerto%",
+                    "TAXA DE RESULTADO: $taxaAcerto%",
                     color = corDestaque,
                     fontWeight = FontWeight.Black,
                     fontSize = 20.sp
                 )
 
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Text(
-                    "Placar exato: ${finalizados.count { it.optBoolean("acertouPlacar") }}",
+                    "PLACAR EXATO: $acertosPlacar de ${finalizados.size}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+
+                Text(
+                    "TAXA DE PLACAR EXATO: $taxaPlacar%",
                     color = Color.LightGray,
-                    fontSize = 12.sp
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+
+                Text(
+                    "Resultado (1X2) considera apenas Casa, Empate ou Fora. Placar exato exige acertar os dois números.",
+                    color = Color.LightGray,
+                    fontSize = 11.sp
                 )
             }
         }
