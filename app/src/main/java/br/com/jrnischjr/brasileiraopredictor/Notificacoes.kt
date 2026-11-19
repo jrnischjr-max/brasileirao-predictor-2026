@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.*
@@ -42,7 +43,7 @@ object AgendadorNotificacoes {
             if (atraso <= 0) return
             val dados = workDataOf("casa" to casa, "fora" to fora, "chave" to chave)
             val pedido = OneTimeWorkRequestBuilder<LembreteJogoWorker>().setInputData(dados).setInitialDelay(atraso, TimeUnit.MILLISECONDS).build()
-            WorkManager.getInstance(context).enqueueUniqueWork("lembrete_${chave.hashCode()}", ExistingWorkPolicy.KEEP, pedido)
-        } catch (_: Exception) { }
+            WorkManager.getInstance(context).enqueueUniqueWork("lembrete_${chave.hashCode()}", ExistingWorkPolicy.UPDATE, pedido)
+        } catch (erro: Exception) { Log.e("AgendadorNotificacoes", "Falha ao agendar lembrete para $casa x $fora", erro) }
     }
 }
