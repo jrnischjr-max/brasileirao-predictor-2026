@@ -223,6 +223,55 @@ object MotorPalpites {
             ?: padrao
     }
 
+    // Reconstitui o contexto disponível antes da partida. Jogos do mesmo dia
+    // são excluídos para evitar usar resultados que talvez tenham ocorrido depois.
+    fun analisarHistorico(
+        jogo: JSONObject,
+        todosJogos: List<JSONObject>
+    ): AnalisePalpite? {
+        val dataAlvo = jogo.optString("data").take(10)
+        if (dataAlvo.isBlank()) return null
+
+        val anteriores = todosJogos.filter { partida ->
+            val dataPartida = partida.optString("data").take(10)
+            dataPartida.isNotBlank() && dataPartida < dataAlvo
+        }
+
+        val nomes = todosJogos.flatMap { partida ->
+            listOf(
+                partida.optJSONObject("mandante")?.optString("nome", "").orEmpty(),
+                partida.optJSONObject("visitante")?.optString("nome", "").orEmpty()
+            )
+        }.filter { it.isNotBlank() }.distinct()
+
+        val estatisticas = nomes.map { nome ->
+            var jogosTime = 0
+            var pontosTime = 0
+            anteriores.forEach { partida ->
+                val situacao = partida.optString("situacao").uppercase()
+                val placar = partida.optJSONObject("placar")
+                val casa = partida.optJSONObject("mandante")?.optString("nome", "").orEmpty()
+                val fora = partida.optJSONObject("visitante")?.optString("nome", "").orEmpty()
+                val gc = placar?.optInt("mandante", -1) ?: -1
+                val gf = placar?.optInt("visitante", -1) ?: -1
+                if (situacao in listOf("FINISHED", "FINALIZADO", "AWARDED") &&
+                    gc >= 0 && gf >= 0 && (casa.equals(nome, true) || fora.equals(nome, true))
+                ) {
+                    jogosTime++
+                    pontosTime += when {
+                        casa.equals(nome, true) && gc > gf -> 3
+                        fora.equals(nome, true) && gf > gc -> 3
+                        gc == gf -> 1
+                        else -> 0
+                    }
+                }
+            }
+            JSONObject().put("nome", nome).put("jogos", jogosTime).put("pontos", pontosTime)
+        }
+
+        return analisar(jogo, anteriores, estatisticas)
+    }
+
     fun analisar(
         jogo: JSONObject,
         todosJogos: List<JSONObject>,
