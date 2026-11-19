@@ -311,6 +311,60 @@ object MotorPalpites {
             ?: padrao
     }
 
+    // Modelo Elo experimental: usa somente partidas anteriores à data-alvo.
+    // O empate é estimado pela frequência histórica anterior, suavizada para evitar extremos.
+    fun probabilidadesEloHistorico(
+        jogo: JSONObject,
+        todosJogos: List<JSONObject>
+    ): Probabilidades1X2? {
+        val nomeCasa = jogo.optJSONObject("mandante")?.optString("nome", "").orEmpty()
+        val nomeFora = jogo.optJSONObject("visitante")?.optString("nome", "").orEmpty()
+        val dataAlvo = jogo.optString("data").take(10)
+        if (nomeCasa.isBlank() || nomeFora.isBlank() || dataAlvo.isBlank()) return null
+
+        val anteriores = partidasFinalizadas(todosJogos)
+            .filter { it.data.take(10).isNotBlank() && it.data.take(10) < dataAlvo }
+        if (anteriores.isEmpty()) return null
+
+        val ratings = mutableMapOf<String, Double>()
+        var empates = 0
+        var total = 0
+        val k = 20.0
+        val vantagemMandante = 65.0
+
+        anteriores.forEach { partida ->
+            val ratingCasa = ratings.getOrPut(partida.casa.lowercase()) { 1500.0 }
+            val ratingFora = ratings.getOrPut(partida.fora.lowercase()) { 1500.0 }
+            val diferenca = ratingCasa + vantagemMandante - ratingFora
+            val esperadoCasa = 1.0 / (1.0 + exp(-kotlin.math.ln(10.0) * diferenca / 400.0))
+            val realCasa = when {
+                partida.golsCasa > partida.golsFora -> 1.0
+                partida.golsCasa == partida.golsFora -> 0.5
+                else -> 0.0
+            }
+            val ajuste = k * (realCasa - esperadoCasa)
+            ratings[partida.casa.lowercase()] = ratingCasa + ajuste
+            ratings[partida.fora.lowercase()] = ratingFora - ajuste
+            if (realCasa == 0.5) empates++
+            total++
+        }
+
+        val ratingCasa = ratings[nomeCasa.lowercase()] ?: 1500.0
+        val ratingFora = ratings[nomeFora.lowercase()] ?: 1500.0
+        val diferenca = ratingCasa + vantagemMandante - ratingFora
+        val esperadoCasa = 1.0 / (1.0 + exp(-kotlin.math.ln(10.0) * diferenca / 400.0))
+        val taxaEmpate = (empates + 5.4) / (total + 20.0)
+        val chanceDecisivaCasa = ((esperadoCasa - taxaEmpate / 2.0) / (1.0 - taxaEmpate))
+            .coerceIn(0.0, 1.0)
+        val casa = (1.0 - taxaEmpate) * chanceDecisivaCasa
+        val fora = (1.0 - taxaEmpate) * (1.0 - chanceDecisivaCasa)
+        return Probabilidades1X2(
+            casa = casa * 100.0,
+            empate = taxaEmpate * 100.0,
+            fora = fora * 100.0
+        )
+    }
+
     // Reconstitui o contexto disponível antes da partida. Jogos do mesmo dia
     // são excluídos para evitar usar resultados que talvez tenham ocorrido depois.
     fun analisarHistorico(
