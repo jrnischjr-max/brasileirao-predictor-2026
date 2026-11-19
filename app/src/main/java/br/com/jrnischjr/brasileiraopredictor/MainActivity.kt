@@ -68,8 +68,6 @@ fun PredictorApp() {
                     auth.signInWithCredential(credencial)
                         .addOnSuccessListener {
                             mensagemGoogle = "Login com Google realizado! Bem-vindo de volta. ✅"
-                            usuarioLogado = true
-                            biometriaLiberada = false
                         }
                         .addOnFailureListener { erro ->
                             mensagemGoogle = "Não foi possível entrar com Google: ${erro.localizedMessage ?: "tente novamente."}"
