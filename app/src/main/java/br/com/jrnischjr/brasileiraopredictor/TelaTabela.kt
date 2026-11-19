@@ -112,34 +112,16 @@ fun TelaTabela(
                     .padding(vertical = 10.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                fun cabecalho(texto: String, largura: Int) {
-                    Text(
-                        texto,
-                        color = corDestaque,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.width(largura.dp),
-                        maxLines = 1
-                    )
-                }
-
-                cabecalho("POS", 28)
-                Text(
-                    "CLUBE",
-                    color = corDestaque,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1
-                )
-                cabecalho("PTS", 27)
-                cabecalho("J", 18)
-                cabecalho("SG", 22)
-                cabecalho("V", 18)
-                cabecalho("E", 18)
-                cabecalho("D", 18)
-                cabecalho("GP", 22)
-                cabecalho("GC", 22)
+                Text("POS", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), maxLines = 1)
+                Text("CLUBE", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1)
+                Text("PTS", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(27.dp), maxLines = 1)
+                Text("J", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(18.dp), maxLines = 1)
+                Text("SG", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(22.dp), maxLines = 1)
+                Text("V", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(18.dp), maxLines = 1)
+                Text("E", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(18.dp), maxLines = 1)
+                Text("D", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(18.dp), maxLines = 1)
+                Text("GP", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(22.dp), maxLines = 1)
+                Text("GC", color = corDestaque, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(22.dp), maxLines = 1)
             }
 
             clubes.forEach { clube ->
