@@ -858,7 +858,7 @@ Row(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("RAIO-X DOS EMPATES", color = corDestaque, fontWeight = FontWeight.Bold)
                 Text(
-                    "Partidas analisadas:", ${probabilidadesEmpate.size} de ${simulados.size}",
+                    "Partidas analisadas: ${probabilidadesEmpate.size} de ${simulados.size}",
                     color = Color.White,
                     fontSize = 12.sp
                 )
