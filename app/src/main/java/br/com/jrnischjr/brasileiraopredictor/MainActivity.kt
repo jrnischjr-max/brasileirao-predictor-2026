@@ -728,6 +728,7 @@ fun TelaPrincipal(
     mensagemGoogle: String,
     onVincularGoogle: () -> Unit
 ) {
+    val context = LocalContext.current
     var abaSelecionada by remember { mutableStateOf("Início") }
     var carregandoJogos by remember { mutableStateOf(false) }
     var erroJogos by remember { mutableStateOf("") }
