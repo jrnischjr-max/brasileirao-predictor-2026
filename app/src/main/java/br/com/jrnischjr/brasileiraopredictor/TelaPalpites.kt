@@ -678,7 +678,7 @@ Row(
                                 erroHistorico = mensagem
                             } else {
                                 carregarHistorico()
-                                erroHistorico = "Simulação concluída: $quantidade novos jogos adicionados."
+                                erroHistorico = "Simulação recalculada: $quantidade partidas atualizadas/adicionadas."
                             }
                         }
                     },
