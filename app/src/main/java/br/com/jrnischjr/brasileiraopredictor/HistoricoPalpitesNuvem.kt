@@ -134,6 +134,13 @@ object HistoricoPalpitesNuvem {
 
                     val analise = MotorPalpites.analisarHistorico(jogo, jogos) ?: return@forEach
                     val previsto = resultadoMaisProvavel(analise)
+                    val elo = MotorPalpites.probabilidadesEloHistorico(jogo, jogos)
+                    val eloCasa = elo?.casa ?: analise.probCasaExata
+                    val eloEmpate = elo?.empate ?: analise.probEmpateExata
+                    val eloFora = elo?.fora ?: analise.probForaExata
+                    val combinadoCasa = (analise.probCasaExata + eloCasa) / 2.0
+                    val combinadoEmpate = (analise.probEmpateExata + eloEmpate) / 2.0
+                    val combinadoFora = (analise.probForaExata + eloFora) / 2.0
                     val real = when {
                         golsCasa > golsFora -> "CASA"
                         golsCasa < golsFora -> "FORA"
@@ -152,6 +159,12 @@ object HistoricoPalpitesNuvem {
                     "probCasaExata" to analise.probCasaExata,
                     "probEmpateExata" to analise.probEmpateExata,
                     "probForaExata" to analise.probForaExata,
+                        "eloProbCasa" to eloCasa,
+                        "eloProbEmpate" to eloEmpate,
+                        "eloProbFora" to eloFora,
+                        "combinadoProbCasa" to combinadoCasa,
+                        "combinadoProbEmpate" to combinadoEmpate,
+                        "combinadoProbFora" to combinadoFora,
                         "golsEsperadosCasa" to analise.golsEsperadosCasa,
                         "golsEsperadosFora" to analise.golsEsperadosFora,
                         "placarCasa" to analise.placarCasa,
