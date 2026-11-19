@@ -253,6 +253,52 @@ fun TelaPalpites(
         Triple(rho, avaliados.size, Triple(acertos, empatesEscolhidos, acertosEmpate))
     }
 
+    // Validação temporal: escolhe rho somente no bloco mais antigo
+    // e mede o desempenho no bloco posterior, que fica fora do ajuste.
+    val jogosDixonOrdenados = simulados.filter {
+        it.has("golsEsperadosCasa") && it.has("golsEsperadosFora") &&
+            it.has("resultadoReal") && it.optString("data").isNotBlank()
+    }.sortedBy { it.optString("data") }
+
+    fun acertosDixonNoGrupo(grupo: List<JSONObject>, rho: Double): Pair<Int, Int> {
+        var acertos = 0
+        grupo.forEach { partida ->
+            val p = MotorPalpites.probabilidadesDixonColes(
+                partida.optDouble("golsEsperadosCasa"),
+                partida.optDouble("golsEsperadosFora"),
+                rho
+            )
+            val previsto = when {
+                p.casa >= p.empate && p.casa >= p.fora -> "CASA"
+                p.empate >= p.fora -> "EMPATE"
+                else -> "FORA"
+            }
+            if (previsto == partida.optString("resultadoReal")) acertos++
+        }
+        return acertos to grupo.size
+    }
+
+    val indiceSeparacao = (jogosDixonOrdenados.size * 0.70).toInt()
+    val validacaoTemporalDisponivel = jogosDixonOrdenados.size >= 20 &&
+        indiceSeparacao in 1 until jogosDixonOrdenados.size
+    val treinoDixon = if (validacaoTemporalDisponivel)
+        jogosDixonOrdenados.take(indiceSeparacao) else emptyList()
+    val testeDixon = if (validacaoTemporalDisponivel)
+        jogosDixonOrdenados.drop(indiceSeparacao) else emptyList()
+    val rhoEscolhido = if (validacaoTemporalDisponivel) {
+        listOf(0.0, -0.05, -0.10, -0.15, -0.20, -0.25)
+            .map { rho -> rho to acertosDixonNoGrupo(treinoDixon, rho) }
+            .maxWithOrNull(
+                compareBy<Pair<Double, Pair<Int, Int>>> { (_, resultado) ->
+                    if (resultado.second > 0) resultado.first.toDouble() / resultado.second else 0.0
+                }.thenBy { (rho, _) -> -kotlin.math.abs(rho) }
+            )?.first ?: 0.0
+    } else 0.0
+    val resultadoBaseTeste = if (validacaoTemporalDisponivel)
+        acertosDixonNoGrupo(testeDixon, 0.0) else 0 to 0
+    val resultadoAjustadoTeste = if (validacaoTemporalDisponivel)
+        acertosDixonNoGrupo(testeDixon, rhoEscolhido) else 0 to 0
+
     // Raio-X específico para entender por que o empate não é escolhido.
     val probabilidadesEmpate = simulados.map {
         probabilidade(it, "probEmpateExata", "probEmpate")
@@ -855,6 +901,37 @@ Row(
                     color = Color.LightGray,
                     fontSize = 10.sp
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("VALIDAÇÃO TEMPORAL (70% TREINO / 30% TESTE)", color = corDestaque, fontWeight = FontWeight.Bold)
+                if (validacaoTemporalDisponivel) {
+                    Text(
+                        "Ajuste escolhido no bloco antigo: ρ ${"%.2f".format(java.util.Locale.US, rhoEscolhido)}",
+                        color = Color.White,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        "Treino: ${treinoDixon.size} jogos • Teste futuro: ${testeDixon.size} jogos",
+                        color = Color.LightGray,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        "Modelo original no teste: ${resultadoBaseTeste.first}/${resultadoBaseTeste.second} (${if (resultadoBaseTeste.second > 0) resultadoBaseTeste.first * 100 / resultadoBaseTeste.second else 0}%)",
+                        color = Color.White,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        "Modelo experimental no teste: ${resultadoAjustadoTeste.first}/${resultadoAjustadoTeste.second} (${if (resultadoAjustadoTeste.second > 0) resultadoAjustadoTeste.first * 100 / resultadoAjustadoTeste.second else 0}%)",
+                        color = corDestaque,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                } else {
+                    Text(
+                        "Aguardando pelo menos 20 partidas com dados completos para separar treino e teste sem misturar períodos.",
+                        color = Color.LightGray,
+                        fontSize = 11.sp
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("RAIO-X DOS EMPATES", color = corDestaque, fontWeight = FontWeight.Bold)
                 Text(
