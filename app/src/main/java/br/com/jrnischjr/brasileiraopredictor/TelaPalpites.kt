@@ -202,6 +202,38 @@ fun TelaPalpites(
         (acertosSimulados * 100) / simulados.size
     } else 0
 
+    // Diagnóstico por tipo de resultado previsto e nível de confiança.
+    fun resultadoPrevisto(palpite: JSONObject): String {
+        val casa = palpite.optInt("probCasa")
+        val empate = palpite.optInt("probEmpate")
+        val fora = palpite.optInt("probFora")
+        return when {
+            casa >= empate && casa >= fora -> "CASA"
+            empate >= fora -> "EMPATE"
+            else -> "FORA"
+        }
+    }
+
+    fun taxaDoGrupo(grupo: List<JSONObject>): String {
+        if (grupo.isEmpty()) return "Sem amostra"
+        val acertosGrupo = grupo.count { it.optBoolean("acertouResultado") }
+        return "${(acertosGrupo * 100) / grupo.size}% (${acertosGrupo}/${grupo.size})"
+    }
+
+    val simuladosCasa = simulados.filter { resultadoPrevisto(it) == "CASA" }
+    val simuladosEmpate = simulados.filter { resultadoPrevisto(it) == "EMPATE" }
+    val simuladosFora = simulados.filter { resultadoPrevisto(it) == "FORA" }
+    val simuladosAltaConf = simulados.filter {
+        maxOf(it.optInt("probCasa"), it.optInt("probEmpate"), it.optInt("probFora")) >= 50
+    }
+    val simuladosMediaConf = simulados.filter {
+        val maior = maxOf(it.optInt("probCasa"), it.optInt("probEmpate"), it.optInt("probFora"))
+        maior in 40..49
+    }
+    val simuladosBaixaConf = simulados.filter {
+        maxOf(it.optInt("probCasa"), it.optInt("probEmpate"), it.optInt("probFora")) < 40
+    }
+
     // Acerto de resultado significa acertar Casa/Empate/Fora (1X2).
     val acertos = finalizados.count {
         it.optBoolean("acertouResultado")
@@ -689,6 +721,31 @@ Row(
                 }
                 Text(
                     "Executa somente partidas finalizadas ainda não registradas. Não altera seus palpites reais.",
+                    color = Color.LightGray,
+                    fontSize = 10.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = corCartao)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text("DIAGNÓSTICO DOS ERROS", color = corDestaque, fontWeight = FontWeight.Bold)
+                Text("Acerto por resultado previsto", color = Color.White, fontSize = 12.sp)
+                Text("Vitória da casa: ${taxaDoGrupo(simuladosCasa)}", color = Color.White, fontSize = 12.sp)
+                Text("Empate: ${taxaDoGrupo(simuladosEmpate)}", color = Color.White, fontSize = 12.sp)
+                Text("Vitória de fora: ${taxaDoGrupo(simuladosFora)}", color = Color.White, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Acerto por confiança máxima", color = Color.White, fontSize = 12.sp)
+                Text("50% ou mais: ${taxaDoGrupo(simuladosAltaConf)}", color = Color.White, fontSize = 12.sp)
+                Text("40% a 49%: ${taxaDoGrupo(simuladosMediaConf)}", color = Color.White, fontSize = 12.sp)
+                Text("Abaixo de 40%: ${taxaDoGrupo(simuladosBaixaConf)}", color = Color.White, fontSize = 12.sp)
+                Text(
+                    "Esses recortes mostram onde o motor acerta e erra. Grupos pequenos ainda não permitem conclusões firmes.",
                     color = Color.LightGray,
                     fontSize = 10.sp
                 )
