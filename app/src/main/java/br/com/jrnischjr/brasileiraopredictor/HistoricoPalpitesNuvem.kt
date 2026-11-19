@@ -10,9 +10,9 @@ object HistoricoPalpitesNuvem {
 
     private fun resultadoMaisProvavel(analise: AnalisePalpite): String {
         return when {
-            analise.probCasa >= analise.probEmpate &&
-                analise.probCasa >= analise.probFora -> "CASA"
-            analise.probEmpate >= analise.probFora -> "EMPATE"
+            analise.probCasaExata >= analise.probEmpateExata &&
+                analise.probCasaExata >= analise.probForaExata -> "CASA"
+            analise.probEmpateExata >= analise.probForaExata -> "EMPATE"
             else -> "FORA"
         }
     }
@@ -76,6 +76,9 @@ object HistoricoPalpitesNuvem {
                     "probCasa" to analise.probCasa,
                     "probEmpate" to analise.probEmpate,
                     "probFora" to analise.probFora,
+                    "probCasaExata" to analise.probCasaExata,
+                    "probEmpateExata" to analise.probEmpateExata,
+                    "probForaExata" to analise.probForaExata,
                     "placarCasa" to analise.placarCasa,
                     "placarFora" to analise.placarFora,
                     "resultadoPrevisto" to resultadoPrevisto,
@@ -144,6 +147,9 @@ object HistoricoPalpitesNuvem {
                         "probCasa" to analise.probCasa,
                         "probEmpate" to analise.probEmpate,
                         "probFora" to analise.probFora,
+                    "probCasaExata" to analise.probCasaExata,
+                    "probEmpateExata" to analise.probEmpateExata,
+                    "probForaExata" to analise.probForaExata,
                         "placarCasa" to analise.placarCasa,
                         "placarFora" to analise.placarFora,
                         "resultadoPrevisto" to previsto,
