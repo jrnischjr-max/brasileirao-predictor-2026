@@ -14,6 +14,8 @@ object HistoricoPalpitesNuvem {
 
     private val db = FirebaseFirestore.getInstance()
     private val simulacaoExecutor = Executors.newSingleThreadExecutor()
+    // Conversão de documentos grandes fora da thread da interface.
+    private val leituraExecutor = Executors.newFixedThreadPool(2)
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private fun resultadoMaisProvavel(analise: AnalisePalpite): String {
@@ -37,10 +39,20 @@ object HistoricoPalpitesNuvem {
         colecao(uid)
             .get()
             .addOnSuccessListener { documentos ->
-                val lista = documentos.documents.mapNotNull { documento ->
-                    documento.data?.let { JSONObject(it) }
+                // Históricos podem conter milhares de partidas. A conversão
+                // Map -> JSONObject não deve bloquear a thread principal.
+                leituraExecutor.execute {
+                    val lista = documentos.documents.mapNotNull { documento ->
+                        try {
+                            documento.data?.let { JSONObject(it) }
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                    mainHandler.post {
+                        callback(lista, null)
+                    }
                 }
-                callback(lista, null)
             }
             .addOnFailureListener { erro ->
                 callback(null, erro.message ?: "Erro ao carregar histórico.")
