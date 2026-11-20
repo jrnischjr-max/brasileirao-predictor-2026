@@ -3,7 +3,7 @@ package br.com.jrnischjr.brasileiraopredictor
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.FieldPath
-import com.google.firebase.firestore.QueryDocumentSnapshot
+import com.google.firebase.firestore.DocumentSnapshot
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -41,7 +41,7 @@ object HistoricoPalpitesNuvem {
         // Busca em páginas pequenas para evitar baixar milhares de documentos
         // em uma única operação e pressionar memória/UI em aparelhos modestos.
         val listaCompleta = mutableListOf<JSONObject>()
-        var ultimoDocumento: QueryDocumentSnapshot? = null
+        var ultimoDocumento: DocumentSnapshot? = null
 
         fun buscarProximaPagina() {
             var consulta = colecao(uid)
