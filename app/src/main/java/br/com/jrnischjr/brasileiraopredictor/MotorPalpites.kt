@@ -443,6 +443,11 @@ object MotorPalpites {
         val dataAlvo = jogo.optString("data").take(10)
         if (dataAlvo.isBlank()) return null
 
+        // Elo passa a ser o modelo principal de resultado 1X2.
+        // Considera apenas partidas finalizadas anteriores à data-alvo.
+        val probabilidadesElo = probabilidadesEloHistorico(jogo, todosJogos)
+            ?: return null
+
         val partidas = partidasFinalizadas(todosJogos)
             .filter { it.data.take(10).isNotBlank() && it.data.take(10) < dataAlvo }
 
@@ -589,9 +594,11 @@ object MotorPalpites {
 
         // Mantém as probabilidades completas para decidir o 1X2.
         // O arredondamento acontece apenas nos valores exibidos/salvos como inteiros.
-        val probCasaExata = vitoriaCasa / total * 100.0
-        val probEmpateExata = empate / total * 100.0
-        val probForaExata = vitoriaFora / total * 100.0
+        // Probabilidades oficiais do motor: Elo.
+        // Poisson permanece como estimador de placar, não do resultado 1X2.
+        val probCasaExata = probabilidadesElo.casa
+        val probEmpateExata = probabilidadesElo.empate
+        val probForaExata = probabilidadesElo.fora
 
         val pCasa = probCasaExata.roundToInt()
         val pEmpate = probEmpateExata.roundToInt()
