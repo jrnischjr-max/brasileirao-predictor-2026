@@ -126,7 +126,7 @@ fun TelaTabela(
 
             clubes.forEach { clube ->
                 val posicao = clube.optInt("posicao")
-                val nome = clube.optString("nome", "Clube")
+                val nome = nomeExibicaoClube(clube.optString("nome", "Clube"))
                 val escudo = clube.optString("escudo").takeIf { it.isNotBlank() }
                 val pontos = clube.optInt("pontos")
                 val jogos = clube.optInt("jogos")
