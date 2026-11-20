@@ -127,39 +127,27 @@ fun TelaPalpites(
             val listaHistorica = dados?.optJSONArray("jogos")
             if (listaHistorica != null) {
                 for (i in 0 until listaHistorica.length()) {
-                    listaHistorica.optJSONObject(i)?.let { jogosHistoricos.add(it) }
+                    val jogo = listaHistorica.optJSONObject(i) ?: continue
+                    val temporada = jogo.optInt(
+                        "temporada",
+                        jogo.optString("data").take(4).toIntOrNull() ?: 0
+                    )
+                    // Mantém somente o Brasileirão 2025 como base histórica.
+                    if (temporada == 2025) jogosHistoricos.add(jogo)
                 }
             }
 
             baseHistoricaPronta = true
             erroBaseHistorica = when {
                 dados == null -> mensagem ?: "Não foi possível carregar a base histórica."
-                jogosHistoricos.isEmpty() -> "A API não retornou partidas históricas."
-                else -> {
-                    val temporadas = dados.optJSONArray("temporadasConsultadas")
-                    val temporadasOk = mutableListOf<String>()
-                    if (temporadas != null) {
-                        for (i in 0 until temporadas.length()) {
-                            val item = temporadas.optJSONObject(i) ?: continue
-                            if (item.optBoolean("sucesso")) {
-                                temporadasOk.add(item.optString("temporada"))
-                            }
-                        }
-                    }
-                    val avisos = dados.optJSONArray("avisos")
-                    val aviso2022 = (0 until (avisos?.length() ?: 0))
-                        .mapNotNull { avisos?.optJSONObject(it) }
-                        .firstOrNull { it.optInt("temporada") == 2022 }
-                    "Base histórica: " + jogosHistoricos.size +
-                        " jogos (" + temporadasOk.joinToString(", ") + ")." +
-                        if (aviso2022 != null) " Temporada 2022 restrita pelo fornecedor." else ""
-                }
+                jogosHistoricos.isEmpty() -> "A API não retornou partidas do Brasileirão 2025."
+                else -> "Base histórica 2025: ${jogosHistoricos.size} jogos."
             }
         }
     }
 
-    // Une o calendário atual à memória histórica, removendo IDs repetidos.
-    // A ordenação cronológica é importante para forma e confrontos diretos.
+    // O motor consulta apenas 2025 como temporada histórica e acrescenta
+    // os resultados já disponíveis do calendário atual de 2026.
     val todosJogosMotor = remember(jogos.size, jogosHistoricos.size) {
         (jogosHistoricos.toList() + jogos.toList())
             .distinctBy { jogo ->
@@ -267,8 +255,13 @@ fun TelaPalpites(
     val taxaPlacarUsuario = if (finalizadosUsuario.isNotEmpty()) acertosPlacarUsuario * 100 / finalizadosUsuario.size else 0
 
     val simulados = historico.filter {
+        val temporada = it.optInt(
+            "temporada",
+            it.optString("data").take(4).toIntOrNull() ?: 0
+        )
         it.optBoolean("finalizado") &&
-            it.optString("origem") == "SIMULACAO_HISTORICA"
+            it.optString("origem") == "SIMULACAO_HISTORICA" &&
+            temporada == 2025
     }
 
     val acertosSimulados = simulados.count { it.optBoolean("acertouResultado") }
@@ -1429,7 +1422,9 @@ Row(
                 Button(
                     onClick = {
                         simulandoHistorico = true
-                        HistoricoPalpitesNuvem.gerarSimulacaoHistorica(uid, todosJogosMotor) { quantidade, mensagem ->
+                        // A simulação histórica avalia somente as 380 partidas de 2025.
+                        // Não inclui jogos de 2026 nem altera palpites reais do usuário.
+                        HistoricoPalpitesNuvem.gerarSimulacaoHistorica(uid, jogosHistoricos.toList()) { quantidade, mensagem ->
                             simulandoHistorico = false
                             if (mensagem != null) {
                                 erroHistorico = mensagem
