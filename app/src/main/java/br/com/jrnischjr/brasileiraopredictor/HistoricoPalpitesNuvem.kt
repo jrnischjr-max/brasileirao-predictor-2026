@@ -6,10 +6,15 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.Executors
+import android.os.Handler
+import android.os.Looper
 
 object HistoricoPalpitesNuvem {
 
     private val db = FirebaseFirestore.getInstance()
+    private val simulacaoExecutor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private fun resultadoMaisProvavel(analise: AnalisePalpite): String {
         return when {
@@ -186,6 +191,9 @@ object HistoricoPalpitesNuvem {
     ) {
         colecao(uid).get()
             .addOnSuccessListener { existentes ->
+                // A reconstrução de mais de mil partidas é pesada. Nunca executar
+                // esse processamento na thread principal, para evitar ANR/fechamento.
+                simulacaoExecutor.execute {
                 val documentosExistentes = existentes.documents.associateBy { it.id }
                 val operacoes = mutableListOf<Pair<com.google.firebase.firestore.DocumentReference, Map<String, Any>>>()
 
@@ -268,8 +276,8 @@ object HistoricoPalpitesNuvem {
                 }
 
                 if (operacoes.isEmpty()) {
-                    callback(0, null)
-                    return@addOnSuccessListener
+                    mainHandler.post { callback(0, null) }
+                    return@execute
                 }
 
                 // Firestore aceita no máximo 500 operações por lote.
@@ -304,6 +312,7 @@ object HistoricoPalpitesNuvem {
                 }
 
                 confirmarLote(0, 0)
+                }
             }
             .addOnFailureListener { erro ->
                 callback(0, erro.message ?: "Erro ao consultar histórico existente.")
