@@ -1,6 +1,8 @@
 package br.com.jrnischjr.brasileiraopredictor
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -923,28 +925,48 @@ fun TelaPalpites(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            Box {
-                OutlinedButton(
-                    onClick = { rodadaMenuAberto = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("RODADA $rodadaExibida  ▼")
-                }
+            OutlinedButton(
+                onClick = { rodadaMenuAberto = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("RODADA $rodadaExibida  ▼")
+            }
 
-                DropdownMenu(
-                    expanded = rodadaMenuAberto,
-                    onDismissRequest = { rodadaMenuAberto = false }
-                ) {
-                    rodadasDisponiveis.forEach { numeroRodada ->
-                        DropdownMenuItem(
-                            text = { Text("Rodada $numeroRodada") },
-                            onClick = {
-                                rodadaSelecionada = numeroRodada
-                                rodadaMenuAberto = false
+            if (rodadaMenuAberto) {
+                AlertDialog(
+                    onDismissRequest = { rodadaMenuAberto = false },
+                    title = { Text("Selecionar rodada") },
+                    text = {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 460.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            rodadasDisponiveis.forEach { numeroRodada ->
+                                TextButton(
+                                    onClick = {
+                                        rodadaSelecionada = numeroRodada
+                                        rodadaMenuAberto = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        "RODADA $numeroRodada",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = if (rodadaSelecionada == numeroRodada)
+                                            corDestaque else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
-                        )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { rodadaMenuAberto = false }) {
+                            Text("FECHAR")
+                        }
                     }
-                }
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
