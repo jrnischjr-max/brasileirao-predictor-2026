@@ -361,117 +361,117 @@ object HistoricoPalpitesNuvem {
         jogos: List<JSONObject>,
         callback: (List<JSONObject>?, String?) -> Unit
     ) {
-        colecao(uid)
-            .get()
+        // Indexa os jogos uma única vez. Antes, cada documento do Firestore
+        // percorria novamente toda a lista de partidas (custo quadrático).
+        val jogosPorId = HashMap<String, JSONObject>(jogos.size * 2)
+        val jogosPorChave = HashMap<String, JSONObject>(jogos.size * 2)
+        jogos.forEach { jogo ->
+            val id = jogo.optString("id")
+            if (id.isNotBlank()) jogosPorId[id] = jogo
+            val casa = jogo.optJSONObject("mandante")?.optString("nome", "").orEmpty()
+            val fora = jogo.optJSONObject("visitante")?.optString("nome", "").orEmpty()
+            val chave = "${jogo.optString("rodada")}_${jogo.optString("data")}_${casa}_${fora}"
+            jogosPorChave[chave] = jogo
+        }
+
+        colecao(uid).get()
             .addOnSuccessListener { documentos ->
+                // Toda conversão, comparação e preparação de gravação acontece
+                // fora da thread principal para a aba abrir sem congelar.
+                leituraExecutor.execute {
+                    val atualizados = mutableListOf<JSONObject>()
+                    val operacoes = mutableListOf<Pair<com.google.firebase.firestore.DocumentReference, Map<String, Any>>>()
 
-                val atualizados = mutableListOf<JSONObject>()
-                val lote = db.batch()
-                var houveAtualizacao = false
-
-                documentos.documents.forEach { documento ->
-
-                    val dados = documento.data ?: return@forEach
-                    val palpite = JSONObject(dados)
-                    val jaEstavaFinalizado = palpite.optBoolean("finalizado")
-
-                    if (!jaEstavaFinalizado) {
-
-                        val id = palpite.optString("idJogo")
-
-                        val jogoReal = jogos.firstOrNull { jogo ->
-                            val idReal = jogo.optString("id")
-
-                            if (idReal.isNotBlank()) {
-                                idReal == id
-                            } else {
-                                val casa = jogo.optJSONObject("mandante")
-                                    ?.optString("nome", "") ?: ""
-
-                                val fora = jogo.optJSONObject("visitante")
-                                    ?.optString("nome", "") ?: ""
-
-                                id == "${jogo.optString("rodada")}_${jogo.optString("data")}_${casa}_${fora}"
-                            }
+                    documentos.documents.forEach { documento ->
+                        val dados = documento.data ?: return@forEach
+                        val palpite = try {
+                            JSONObject(dados)
+                        } catch (_: Exception) {
+                            return@forEach
                         }
+                        val jaEstavaFinalizado = palpite.optBoolean("finalizado")
 
-                        if (jogoReal != null) {
-                            val situacao = jogoReal
-                                .optString("situacao")
-                                .uppercase()
-
-                            if (situacao in listOf(
-                                    "FINISHED",
-                                    "FINALIZADO",
-                                    "AWARDED"
-                                )
-                            ) {
-                                val placar = jogoReal.optJSONObject("placar")
-
-                                val golsCasa = placar?.optInt("mandante", -1) ?: -1
-                                val golsFora = placar?.optInt("visitante", -1) ?: -1
-
-                                if (golsCasa >= 0 && golsFora >= 0) {
-                                    palpite.put("golsReaisCasa", golsCasa)
-                                    palpite.put("golsReaisFora", golsFora)
-                                    palpite.put("finalizado", true)
+                        if (!jaEstavaFinalizado) {
+                            val id = palpite.optString("idJogo")
+                            val jogoReal = jogosPorId[id] ?: jogosPorChave[id]
+                            if (jogoReal != null) {
+                                val situacao = jogoReal.optString("situacao").uppercase()
+                                if (situacao in listOf("FINISHED", "FINALIZADO", "AWARDED")) {
+                                    val placar = jogoReal.optJSONObject("placar")
+                                    val golsCasa = placar?.optInt("mandante", -1) ?: -1
+                                    val golsFora = placar?.optInt("visitante", -1) ?: -1
+                                    if (golsCasa >= 0 && golsFora >= 0) {
+                                        palpite.put("golsReaisCasa", golsCasa)
+                                        palpite.put("golsReaisFora", golsFora)
+                                        palpite.put("finalizado", true)
+                                    }
                                 }
                             }
                         }
+
+                        if (palpite.optBoolean("finalizado")) {
+                            val resultadoAnterior = palpite.optString("resultadoReal")
+                            val acertouResultadoAnterior = palpite.optBoolean("acertouResultado")
+                            val acertouPlacarAnterior = palpite.optBoolean("acertouPlacar")
+                            val usuarioAcertouResultadoAnterior = palpite.optBoolean("usuarioAcertouResultado")
+                            val usuarioAcertouPlacarAnterior = palpite.optBoolean("usuarioAcertouPlacar")
+                            val tinhaMetricasUsuario = !palpite.has("usuarioPlacarCasa") ||
+                                (palpite.has("usuarioResultadoReal") &&
+                                    palpite.has("usuarioAcertouResultado") &&
+                                    palpite.has("usuarioAcertouPlacar"))
+                            val temPalpiteMotor = palpite.has("placarCasa") && palpite.has("placarFora")
+                            val tinhaMetricas = !temPalpiteMotor ||
+                                (palpite.has("resultadoReal") &&
+                                    palpite.has("acertouResultado") &&
+                                    palpite.has("acertouPlacar"))
+
+                            avaliar(palpite)
+
+                            val precisaSalvar = !jaEstavaFinalizado ||
+                                !tinhaMetricas ||
+                                !tinhaMetricasUsuario ||
+                                resultadoAnterior != palpite.optString("resultadoReal") ||
+                                acertouResultadoAnterior != palpite.optBoolean("acertouResultado") ||
+                                acertouPlacarAnterior != palpite.optBoolean("acertouPlacar") ||
+                                usuarioAcertouResultadoAnterior != palpite.optBoolean("usuarioAcertouResultado") ||
+                                usuarioAcertouPlacarAnterior != palpite.optBoolean("usuarioAcertouPlacar")
+
+                            if (precisaSalvar) {
+                                operacoes.add(documento.reference to palpite.toMap())
+                            }
+                        }
+                        atualizados.add(palpite)
                     }
 
-                    if (palpite.optBoolean("finalizado")) {
-                        // Reavalia também partidas antigas para preencher/corrigir
-                        // as métricas de resultado e placar exato no histórico.
-                        val resultadoAnterior = palpite.optString("resultadoReal")
-                        val acertouResultadoAnterior = palpite.optBoolean("acertouResultado")
-                        val acertouPlacarAnterior = palpite.optBoolean("acertouPlacar")
-                        val usuarioAcertouResultadoAnterior = palpite.optBoolean("usuarioAcertouResultado")
-                        val usuarioAcertouPlacarAnterior = palpite.optBoolean("usuarioAcertouPlacar")
-                        val tinhaMetricasUsuario = !palpite.has("usuarioPlacarCasa") ||
-                            (palpite.has("usuarioResultadoReal") &&
-                                palpite.has("usuarioAcertouResultado") &&
-                                palpite.has("usuarioAcertouPlacar"))
-                        val temPalpiteMotor = palpite.has("placarCasa") && palpite.has("placarFora")
-                        val tinhaMetricas = !temPalpiteMotor ||
-                            (palpite.has("resultadoReal") &&
-                                palpite.has("acertouResultado") &&
-                                palpite.has("acertouPlacar"))
-
-                        avaliar(palpite)
-
-                        val precisaSalvar = !jaEstavaFinalizado ||
-                            !tinhaMetricas ||
-                            !tinhaMetricasUsuario ||
-                            resultadoAnterior != palpite.optString("resultadoReal") ||
-                            acertouResultadoAnterior != palpite.optBoolean("acertouResultado") ||
-                            acertouPlacarAnterior != palpite.optBoolean("acertouPlacar") ||
-                            usuarioAcertouResultadoAnterior != palpite.optBoolean("usuarioAcertouResultado") ||
-                            usuarioAcertouPlacarAnterior != palpite.optBoolean("usuarioAcertouPlacar")
-
-                        if (precisaSalvar) {
-                            lote.set(
-                                documento.reference,
-                                palpite.toMap(),
-                                SetOptions.merge()
-                            )
-                            houveAtualizacao = true
-                        }
+                    fun concluirComErro(mensagem: String) {
+                        mainHandler.post { callback(null, mensagem) }
                     }
 
-                    atualizados.add(palpite)
-                }
+                    fun confirmarLote(indiceInicial: Int) {
+                        if (indiceInicial >= operacoes.size) {
+                            mainHandler.post { callback(atualizados, null) }
+                            return
+                        }
+                        val indiceFinal = minOf(indiceInicial + 450, operacoes.size)
+                        val lote = db.batch()
+                        for (indice in indiceInicial until indiceFinal) {
+                            val (referencia, registro) = operacoes[indice]
+                            lote.set(referencia, registro, SetOptions.merge())
+                        }
+                        lote.commit()
+                            .addOnSuccessListener {
+                                confirmarLote(indiceFinal)
+                            }
+                            .addOnFailureListener { erro ->
+                                concluirComErro(erro.message ?: "Erro ao atualizar histórico.")
+                            }
+                    }
 
-                if (!houveAtualizacao) {
-                    callback(atualizados, null)
-                } else {
-                    lote.commit()
-                        .addOnSuccessListener {
-                            callback(atualizados, null)
-                        }
-                        .addOnFailureListener { erro ->
-                            callback(null, erro.message ?: "Erro ao atualizar histórico.")
-                        }
+                    if (operacoes.isEmpty()) {
+                        mainHandler.post { callback(atualizados, null) }
+                    } else {
+                        confirmarLote(0)
+                    }
                 }
             }
             .addOnFailureListener { erro ->
