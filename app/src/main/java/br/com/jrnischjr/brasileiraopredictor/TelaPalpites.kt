@@ -960,11 +960,11 @@ fun TelaPalpites(
 
             proximosJogos.forEach { jogo ->
 
-                val mandante = jogo.optJSONObject("mandante")
-                    ?.optString("nome", "") ?: ""
+                val mandante = nomeExibicaoClube(jogo.optJSONObject("mandante")
+                    ?.optString("nome", "") ?: "")
 
-                val visitante = jogo.optJSONObject("visitante")
-                    ?.optString("nome", "") ?: ""
+                val visitante = nomeExibicaoClube(jogo.optJSONObject("visitante")
+                    ?.optString("nome", "") ?: "")
 
                 val idJogo = jogo.optString("id").ifBlank {
                     "${jogo.optString("rodada")}_${jogo.optString("data")}_${mandante}_${visitante}"
