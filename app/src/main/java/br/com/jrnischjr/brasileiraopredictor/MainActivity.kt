@@ -20,6 +20,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.painterResource
@@ -1395,7 +1396,7 @@ private fun IntroSplash(onFinished: () -> Unit) {
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 76.dp)
-                .then(if (assinaturaVisivel) Modifier else Modifier)
+                .alpha(if (assinaturaVisivel) 1f else 0f)
         )
     }
 }
