@@ -883,10 +883,9 @@ fun TelaPrincipal(
         }
     }
 
-    val rodadasDisponiveis = jogos
-        .mapNotNull { it.optString("rodada").toIntOrNull() }
-        .distinct()
-        .sorted()
+    // A Série A tem 38 rodadas. Mantém todas no seletor,
+    // mesmo quando a API ainda não retornou partidas de uma rodada.
+    val rodadasDisponiveis = (1..38).toList()
 
     val jogosDaRodada = jogos.filter {
         it.optString("rodada").toIntOrNull() == rodadaSelecionada
