@@ -219,11 +219,9 @@ fun TelaPalpites(
         situacao != "AWARDED"
     }
 
-    val rodadasDisponiveis = jogos
-        .map { it.optInt("rodada") }
-        .filter { it > 0 }
-        .distinct()
-        .sorted()
+    // Mantém as 38 rodadas disponíveis também na aba Palpites,
+    // mesmo quando a API ainda não retornou partidas de alguma rodada.
+    val rodadasDisponiveis = (1..38).toList()
 
     val rodadaAtual = jogosPendentes
         .minOfOrNull { it.optInt("rodada") }
