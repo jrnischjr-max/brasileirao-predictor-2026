@@ -2,6 +2,8 @@ package br.com.jrnischjr.brasileiraopredictor
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.FieldPath
+import com.google.firebase.firestore.QueryDocumentSnapshot
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -36,27 +38,50 @@ object HistoricoPalpitesNuvem {
         uid: String,
         callback: (List<JSONObject>?, String?) -> Unit
     ) {
-        colecao(uid)
-            .get()
-            .addOnSuccessListener { documentos ->
-                // Históricos podem conter milhares de partidas. A conversão
-                // Map -> JSONObject não deve bloquear a thread principal.
-                leituraExecutor.execute {
-                    val lista = documentos.documents.mapNotNull { documento ->
-                        try {
-                            documento.data?.let { JSONObject(it) }
-                        } catch (_: Exception) {
-                            null
+        // Busca em páginas pequenas para evitar baixar milhares de documentos
+        // em uma única operação e pressionar memória/UI em aparelhos modestos.
+        val listaCompleta = mutableListOf<JSONObject>()
+        var ultimoDocumento: QueryDocumentSnapshot? = null
+
+        fun buscarProximaPagina() {
+            var consulta = colecao(uid)
+                .orderBy(FieldPath.documentId())
+                .limit(200)
+
+            ultimoDocumento?.let { consulta = consulta.startAfter(it) }
+
+            consulta.get()
+                .addOnSuccessListener { pagina ->
+                    if (pagina.isEmpty) {
+                        callback(listaCompleta, null)
+                        return@addOnSuccessListener
+                    }
+
+                    ultimoDocumento = pagina.documents.last()
+                    leituraExecutor.execute {
+                        val convertidos = pagina.documents.mapNotNull { documento ->
+                            try {
+                                documento.data?.let { JSONObject(it) }
+                            } catch (_: Exception) {
+                                null
+                            }
+                        }
+                        listaCompleta.addAll(convertidos)
+                        mainHandler.post {
+                            if (pagina.size() < 200) {
+                                callback(listaCompleta, null)
+                            } else {
+                                buscarProximaPagina()
+                            }
                         }
                     }
-                    mainHandler.post {
-                        callback(lista, null)
-                    }
                 }
-            }
-            .addOnFailureListener { erro ->
-                callback(null, erro.message ?: "Erro ao carregar histórico.")
-            }
+                .addOnFailureListener { erro ->
+                    callback(null, erro.message ?: "Erro ao carregar histórico.")
+                }
+        }
+
+        buscarProximaPagina()
     }
 
     fun salvar(
