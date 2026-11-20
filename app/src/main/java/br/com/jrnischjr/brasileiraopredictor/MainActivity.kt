@@ -12,6 +12,21 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Brush
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -51,6 +66,7 @@ fun PredictorApp() {
     val db = remember { FirebaseFirestore.getInstance() }
     val context = LocalContext.current
     val activity = context as? FragmentActivity
+    var introVisivel by remember { mutableStateOf(true) }
     var mensagemGoogle by remember { mutableStateOf("") }
     var usuarioLogado by remember { mutableStateOf(auth.currentUser != null) }
     var biometriaLiberada by remember { mutableStateOf(false) }
@@ -326,7 +342,9 @@ fun PredictorApp() {
     }
 
     MaterialTheme {
-        if (usuarioLogado && biometriaLiberada) {
+        if (introVisivel) {
+            IntroSplash(onFinished = { introVisivel = false })
+        } else if (usuarioLogado && biometriaLiberada) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1290,5 +1308,94 @@ Row(
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun IntroSplash(onFinished: () -> Unit) {
+    var assinaturaVisivel by remember { mutableStateOf(false) }
+    val transicao = rememberInfiniteTransition(label = "orbita_clubes")
+    val angulo by transicao.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotacao"
+    )
+
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(2200)
+        assinaturaVisivel = true
+        kotlinx.coroutines.delay(700)
+        onFinished()
+    }
+
+    val clubes = listOf(
+        "FLA", "PAL", "COR", "SAO", "SAN",
+        "VAS", "FLU", "BOT", "GRE", "INT",
+        "CAM", "CRU", "BAH", "FOR", "VIT",
+        "CEA", "JUV", "RBB", "MIR", "SPT"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF090B10), Color(0xFF26070D), Color(0xFF08090D))
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier.size(310.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            clubes.forEachIndexed { index, clube ->
+                val base = (2.0 * Math.PI * index / clubes.size) + Math.toRadians(angulo.toDouble())
+                val x = (cos(base) * 132.0).toFloat()
+                val y = (sin(base) * 132.0).toFloat()
+                Box(
+                    modifier = Modifier
+                        .offset(x = x.dp, y = y.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(if (index % 2 == 0) Color(0xFFB5122B) else Color(0xFF202832)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = clube,
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(
+                    painter = painterResource(id = R.drawable.brasileirao_predictor_icon),
+                    contentDescription = "Brasileirão Predictor",
+                    modifier = Modifier.size(142.dp)
+                )
+                Text("🏆", fontSize = 54.sp)
+            }
+        }
+
+        Text(
+            text = "By Nisch",
+            color = Color.White,
+            fontSize = 25.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 3.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 76.dp)
+                .then(if (assinaturaVisivel) Modifier else Modifier)
+        )
     }
 }
