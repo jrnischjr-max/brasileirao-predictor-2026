@@ -14,8 +14,8 @@ object DadosBrasileirao {
 
     private fun buscarDados(
         endpoint: String,
-        timeoutMs: Int = 15000,
-        callback: (JSONObject?, String?) -> Unit
+        callback: (JSONObject?, String?) -> Unit,
+        timeoutMs: Int = 15000
     ) {
         Thread {
             var conexao: HttpURLConnection? = null
@@ -82,6 +82,6 @@ object DadosBrasileirao {
     fun buscarHistorico(
         callback: (JSONObject?, String?) -> Unit
     ) {
-        buscarDados("fd-history", timeoutMs = 90000, callback = callback)
+        buscarDados("fd-history", callback = callback, timeoutMs = 90000)
     }
 }
