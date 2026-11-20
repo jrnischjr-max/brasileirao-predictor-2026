@@ -224,12 +224,19 @@ def main() -> None:
     matches = normalize(raw)
     if len(matches) < 100:
         raise ValueError(f"Base insuficiente para laboratório: {len(matches)} jogos válidos em {SEASON}.")
-    split = int(len(matches) * 0.70)
-    if split <= 20 or len(matches) - split < 20:
+    dates = sorted({match.date for match in matches})
+    split_date_index = int(len(dates) * 0.70)
+    if split_date_index <= 1 or len(dates) - split_date_index < 2:
         raise ValueError("Amostra insuficiente para validação temporal 70/30.")
+    split_date = dates[split_date_index]
 
     predictions = [predict(match, matches) for match in matches]
-    train, test = predictions[:split], predictions[split:]
+    # O corte é por data, nunca por linha: partidas do mesmo dia não
+    # podem cair simultaneamente em treino e teste.
+    train = [row for row in predictions if row["date"] < split_date]
+    test = [row for row in predictions if row["date"] >= split_date]
+    if len(train) < 20 or len(test) < 20:
+        raise ValueError("Amostra insuficiente após separar treino/teste por data.")
     threshold, train_threshold_metrics = best_draw_threshold(train)
 
     models = {}
@@ -251,7 +258,9 @@ def main() -> None:
         "historical_games": len(matches),
         "train_games": len(train),
         "test_games": len(test),
+        "test_start_date": split_date,
         "same_day_excluded": True,
+        "train_test_split_by_date": True,
         "official_engine_changed": False,
         "models": models,
         "notes": [
@@ -271,7 +280,7 @@ def main() -> None:
         f"- Gerado em: {report['generated_at']}",
         f"- Jogos válidos: **{len(matches)}**",
         f"- Treino cronológico (70%): **{len(train)}**",
-        f"- Teste futuro (30%): **{len(test)}**",
+        f"- Teste futuro (aprox. 30%): **{len(test)}** (a partir de {split_date})",
         "- Partidas do mesmo dia excluídas do contexto para evitar vazamento.",
         "- Motor oficial preservado: **sim**.",
         "",
