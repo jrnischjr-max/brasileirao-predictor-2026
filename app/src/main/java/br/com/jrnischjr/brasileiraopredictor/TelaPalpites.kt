@@ -1173,6 +1173,22 @@ Row(
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
                                     enabled = !partidaBloqueada,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 22.sp
+                                    ),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        disabledTextColor = Color.White,
+                                        cursorColor = Color.White,
+                                        focusedLabelColor = Color.White,
+                                        unfocusedLabelColor = Color.LightGray,
+                                        focusedBorderColor = corDestaque,
+                                        unfocusedBorderColor = corDestaque.copy(alpha = 0.65f),
+                                        disabledBorderColor = corDestaque.copy(alpha = 0.35f)
+                                    ),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                 )
                                 OutlinedTextField(
@@ -1184,6 +1200,22 @@ Row(
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
                                     enabled = !partidaBloqueada,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 22.sp
+                                    ),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        disabledTextColor = Color.White,
+                                        cursorColor = Color.White,
+                                        focusedLabelColor = Color.White,
+                                        unfocusedLabelColor = Color.LightGray,
+                                        focusedBorderColor = corDestaque,
+                                        unfocusedBorderColor = corDestaque.copy(alpha = 0.65f),
+                                        disabledBorderColor = corDestaque.copy(alpha = 0.35f)
+                                    ),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                 )
                             }
