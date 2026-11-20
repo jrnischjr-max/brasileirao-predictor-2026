@@ -34,7 +34,7 @@ fun TelaPalpites(
     var tabelaPronta by remember { mutableStateOf(false) }
     var baseHistoricaPronta by remember { mutableStateOf(false) }
     var erroBaseHistorica by remember { mutableStateOf("") }
-    var historicoCarregando by remember { mutableStateOf(true) }
+    var historicoCarregando by remember { mutableStateOf(false) }
     var erroHistorico by remember { mutableStateOf("") }
     var salvandoPalpite by remember { mutableStateOf(false) }
     var salvandoPalpiteUsuario by remember { mutableStateOf(false) }
@@ -176,14 +176,9 @@ fun TelaPalpites(
         carregarDados()
     }
 
-    LaunchedEffect(uid) {
-        carregarHistorico()
-    }
-
     LaunchedEffect(jogosProntos, tabelaPronta) {
         if (jogosProntos && tabelaPronta) {
             carregando = false
-            atualizarHistorico()
 
             if (jogos.isEmpty() || clubes.isEmpty()) {
                 erro = "Não há dados suficientes para gerar os palpites."
@@ -1314,9 +1309,19 @@ Row(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        Button(
+            onClick = { carregarHistorico() },
+            enabled = !historicoCarregando && uid.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (historicoCarregando) "CARREGANDO HISTÓRICO..." else "CARREGAR MEU HISTÓRICO")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         if (historicoCarregando) {
             Text(
-                "Sincronizando histórico na nuvem...",
+                "Carregando histórico sob solicitação...",
                 color = Color.LightGray,
                 fontSize = 12.sp
             )
