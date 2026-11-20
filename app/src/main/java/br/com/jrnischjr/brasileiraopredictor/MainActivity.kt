@@ -43,6 +43,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.core.content.ContextCompat
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -1316,32 +1321,64 @@ Row(
 @Composable
 private fun IntroSplash(onFinished: () -> Unit) {
     var assinaturaVisivel by remember { mutableStateOf(false) }
-    val transicao = rememberInfiniteTransition(label = "orbita_clubes")
+    val view = LocalView.current
+    val activity = view.context as? Activity
+    val window = activity?.window
+
+    DisposableEffect(window, view) {
+        val controller = window?.let { WindowInsetsControllerCompat(it, view) }
+        controller?.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller?.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose {
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    val transicao = rememberInfiniteTransition(label = "orbita_escudos")
     val angulo by transicao.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            animation = tween(durationMillis = 8000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "rotacao"
+        label = "rotacao_escudos"
     )
 
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(2200)
+        delay(2500)
         assinaturaVisivel = true
-        kotlinx.coroutines.delay(700)
+        delay(1500)
         onFinished()
     }
 
+    // IDs dos clubes no provedor Football-Data. As imagens são carregadas
+    // diretamente dos escudos oficiais publicados pelo provedor.
     val clubes = listOf(
-        "FLA", "PAL", "COR", "SAO", "SAN",
-        "VAS", "FLU", "BOT", "GRE", "INT",
-        "CAM", "CRU", "BAH", "FOR", "VIT",
-        "CEA", "JUV", "RBB", "MIR", "SPT"
+        "Flamengo" to 1783,
+        "Palmeiras" to 1765,
+        "Corinthians" to 1779,
+        "São Paulo" to 1778,
+        "Santos" to 1777,
+        "Vasco" to 1776,
+        "Fluminense" to 1769,
+        "Botafogo" to 1770,
+        "Grêmio" to 1768,
+        "Internacional" to 1771,
+        "Atlético-MG" to 1766,
+        "Cruzeiro" to 1767,
+        "Bahia" to 1764,
+        "Fortaleza" to 3984,
+        "Sport" to 3987,
+        "Vitória" to 1772,
+        "Ceará" to 3986,
+        "Juventude" to 4242,
+        "Red Bull Bragantino" to 3985,
+        "Mirassol" to 595
     )
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(
@@ -1351,27 +1388,32 @@ private fun IntroSplash(onFinished: () -> Unit) {
             ),
         contentAlignment = Alignment.Center
     ) {
+        val raio = minOf(maxWidth.value, maxHeight.value) * 0.36f
+
         Box(
-            modifier = Modifier.size(310.dp),
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             clubes.forEachIndexed { index, clube ->
-                val base = (2.0 * Math.PI * index / clubes.size) + Math.toRadians(angulo.toDouble())
-                val x = (cos(base) * 132.0).toFloat()
-                val y = (sin(base) * 132.0).toFloat()
+                val base = (2.0 * Math.PI * index / clubes.size) +
+                    Math.toRadians(angulo.toDouble())
+                val x = (cos(base) * raio).toFloat().dp
+                val y = (sin(base) * raio).toFloat().dp
+
                 Box(
                     modifier = Modifier
-                        .offset(x = x.dp, y = y.dp)
-                        .size(36.dp)
+                        .offset(x = x, y = y)
+                        .size(42.dp)
                         .clip(CircleShape)
-                        .background(if (index % 2 == 0) Color(0xFFB5122B) else Color(0xFF202832)),
+                        .background(Color.White)
+                        .padding(4.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = clube,
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black
+                    AsyncImage(
+                        model = "https://crests.football-data.org/${clube.second}.png",
+                        contentDescription = "Escudo do ${clube.first}",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
                     )
                 }
             }
@@ -1395,7 +1437,7 @@ private fun IntroSplash(onFinished: () -> Unit) {
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 76.dp)
+                .padding(bottom = 44.dp)
                 .alpha(if (assinaturaVisivel) 1f else 0f)
         )
     }
