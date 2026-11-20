@@ -856,8 +856,8 @@ fun TelaPrincipal(
                 }
 
                 jogos.forEach { jogo ->
-                    val casa = jogo.optJSONObject("mandante")?.optString("nome", "Mandante") ?: "Mandante"
-                    val fora = jogo.optJSONObject("visitante")?.optString("nome", "Visitante") ?: "Visitante"
+                    val casa = nomeExibicaoClube(jogo.optJSONObject("mandante")?.optString("nome", "Mandante") ?: "Mandante")
+                    val fora = nomeExibicaoClube(jogo.optJSONObject("visitante")?.optString("nome", "Visitante") ?: "Visitante")
                     AgendadorNotificacoes.agendar(context, jogo.optString("id", "$casa-$fora-${jogo.optString("data")}"), casa, fora, jogo.optString("data"))
                 }
 
@@ -1158,12 +1158,12 @@ Spacer(modifier = Modifier.height(15.dp))
                             val placar = jogo.optJSONObject("placar")
 
                             val nomeMandante =
-                                mandante?.optString("nome", "Mandante")
-                                    ?: "Mandante"
+                                nomeExibicaoClube(mandante?.optString("nome", "Mandante")
+                                    ?: "Mandante")
 
                             val nomeVisitante =
-                                visitante?.optString("nome", "Visitante")
-                                    ?: "Visitante"
+                                nomeExibicaoClube(visitante?.optString("nome", "Visitante")
+                                    ?: "Visitante")
 
                             val golsMandante =
                                 placar?.optInt("mandante", -1) ?: -1
