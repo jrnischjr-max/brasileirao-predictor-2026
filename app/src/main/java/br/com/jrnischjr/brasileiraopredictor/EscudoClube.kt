@@ -17,6 +17,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 
+fun nomeExibicaoClube(nome: String): String = when (nome.trim()) {
+    "SC Corinthians Paulista" -> "Corinthians"
+    else -> nome
+}
+
 @Composable
 fun EscudoClube(
     url: String?,
