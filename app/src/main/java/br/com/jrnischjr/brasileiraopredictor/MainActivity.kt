@@ -1123,23 +1123,50 @@ Spacer(modifier = Modifier.height(15.dp))
                                 )
                             }
 
-                            DropdownMenu(
-                                expanded = menuRodadasAberto,
-                                onDismissRequest = {
-                                    menuRodadasAberto = false
-                                }
-                            ) {
-                                rodadasDisponiveis.forEach { rodada ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text("Rodada $rodada")
-                                        },
-                                        onClick = {
-                                            rodadaSelecionada = rodada
-                                            menuRodadasAberto = false
+                            if (menuRodadasAberto) {
+                                AlertDialog(
+                                    onDismissRequest = {
+                                        menuRodadasAberto = false
+                                    },
+                                    title = {
+                                        Text("Selecionar rodada")
+                                    },
+                                    text = {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(max = 460.dp)
+                                                .verticalScroll(rememberScrollState())
+                                        ) {
+                                            rodadasDisponiveis.forEach { rodada ->
+                                                TextButton(
+                                                    onClick = {
+                                                        rodadaSelecionada = rodada
+                                                        menuRodadasAberto = false
+                                                    },
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Text(
+                                                        "RODADA $rodada",
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        textAlign = TextAlign.Start,
+                                                        color = if (rodadaSelecionada == rodada)
+                                                            corDestaque else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
                                         }
-                                    )
-                                }
+                                    },
+                                    confirmButton = {
+                                        TextButton(
+                                            onClick = {
+                                                menuRodadasAberto = false
+                                            }
+                                        ) {
+                                            Text("FECHAR")
+                                        }
+                                    }
+                                )
                             }
                         }
 
@@ -1408,6 +1435,17 @@ private fun IntroSplash(onFinished: () -> Unit) {
                         .padding(4.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Identificação local imediata: não deixa a órbita vazia
+                    // enquanto o escudo oficial termina de baixar.
+                    Text(
+                        text = clube.first.split(" ")
+                            .take(2)
+                            .joinToString("") { it.take(1) }
+                            .uppercase(),
+                        color = Color(0xFF202020),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Black
+                    )
                     AsyncImage(
                         model = "https://crests.football-data.org/${clube.second}.png",
                         contentDescription = "Escudo do ${clube.first}",
