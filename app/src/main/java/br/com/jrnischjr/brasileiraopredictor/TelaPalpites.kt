@@ -146,8 +146,13 @@ fun TelaPalpites(
                             }
                         }
                     }
+                    val avisos = dados.optJSONArray("avisos")
+                    val aviso2022 = (0 until (avisos?.length() ?: 0))
+                        .mapNotNull { avisos?.optJSONObject(it) }
+                        .firstOrNull { it.optInt("temporada") == 2022 }
                     "Base histórica: " + jogosHistoricos.size +
-                        " jogos (" + temporadasOk.joinToString(", ") + ")."
+                        " jogos (" + temporadasOk.joinToString(", ") + ")." +
+                        if (aviso2022 != null) " Temporada 2022 restrita pelo fornecedor." else ""
                 }
             }
         }
@@ -902,6 +907,15 @@ fun TelaPalpites(
             )
         }
 
+        if (erroBaseHistorica.isNotEmpty()) {
+            Text(
+                erroBaseHistorica,
+                color = Color.LightGray,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+
         if (erro.isNotEmpty()) {
             Text(erro, color = Color.White)
 
@@ -1420,7 +1434,8 @@ Row(
                             }
                         }
                     },
-                    enabled = !simulandoHistorico && uid.isNotBlank() && jogosProntos && baseHistoricaPronta,
+                    enabled = !simulandoHistorico && uid.isNotBlank() && jogosProntos &&
+                        baseHistoricaPronta && jogosHistoricos.isNotEmpty(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(if (simulandoHistorico) "GERANDO SIMULAÇÃO..." else "GERAR SIMULAÇÃO HISTÓRICA")
