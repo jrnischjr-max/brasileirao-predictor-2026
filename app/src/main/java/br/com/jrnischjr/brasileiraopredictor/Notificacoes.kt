@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
+import android.app.PendingIntent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
@@ -23,8 +25,21 @@ class LembreteJogoWorker(context: Context, params: WorkerParameters) : Worker(co
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = "lembretes_jogos"
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(NotificationChannel(channel, "Lembretes de jogos", NotificationManager.IMPORTANCE_DEFAULT))
+        val abrirApp = Intent(applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("origem_notificacao", true)
+            putExtra("time_mandante", casa)
+            putExtra("time_visitante", fora)
+        }
+        val cliqueNotificacao = PendingIntent.getActivity(
+            applicationContext,
+            inputData.getString("chave")?.hashCode() ?: casa.hashCode(),
+            abrirApp,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val n = NotificationCompat.Builder(applicationContext, channel)
             .setSmallIcon(applicationContext.applicationInfo.icon)
+            .setContentIntent(cliqueNotificacao)
             .setContentTitle("Falta pouco para o jogo!")
             .setContentText("$casa x $fora começa em aproximadamente 30 minutos.")
             .setAutoCancel(true)
