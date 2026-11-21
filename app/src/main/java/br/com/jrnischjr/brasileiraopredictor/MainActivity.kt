@@ -370,7 +370,25 @@ fun PredictorApp() {
                     uid = auth.currentUser?.uid.orEmpty(),
                     emailGoogleVinculado = auth.currentUser?.providerData?.any { it.providerId == "google.com" } == true,
                     mensagemGoogle = mensagemGoogle,
-                    onVincularGoogle = vincularGoogle
+                    onVincularGoogle = vincularGoogle,
+                    onSair = {
+                        val opcoesSaida = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestIdToken("225614080330-nntuemb7tcurafgglidhoe0h3mlvrmr8.apps.googleusercontent.com")
+                            .requestEmail()
+                            .build()
+                        GoogleSignIn.getClient(context, opcoesSaida).signOut()
+                            .addOnCompleteListener {
+                                auth.signOut()
+                                usuarioLogado = false
+                                biometriaLiberada = false
+                                autenticacaoIniciada = false
+                                cadastro = false
+                                mensagem = ""
+                                mensagemGoogle = ""
+                                nomeUsuario = ""
+                                time = ""
+                            }
+                    }
                 )
             }
         } else if (usuarioLogado) {
@@ -760,7 +778,8 @@ fun TelaPrincipal(
     uid: String,
     emailGoogleVinculado: Boolean,
     mensagemGoogle: String,
-    onVincularGoogle: () -> Unit
+    onVincularGoogle: () -> Unit,
+    onSair: () -> Unit
 ) {
     val context = LocalContext.current
     val dbRanking = remember { FirebaseFirestore.getInstance() }
@@ -960,19 +979,34 @@ fun TelaPrincipal(
         ) {
             SelectionContainer {
                 Column {
-            Text(
-                "BRASILEIRÃO",
-                color = Color.White,
-                fontSize = 27.sp,
-                fontWeight = FontWeight.Black
-            )
-
-            Text(
-                "PREDICTOR 2026 • BY NISCH",
-                color = corDestaque,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        "BRASILEIRÃO",
+                        color = Color.White,
+                        fontSize = 27.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        "PREDICTOR 2026 • BY NISCH",
+                        color = corDestaque,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                TextButton(onClick = onSair) {
+                    Text(
+                        "SAIR / TROCAR",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(22.dp))
 
