@@ -842,10 +842,11 @@ fun TelaPalpites(
         appendLine("Empate ficou até 5 pontos do favorito: $empatesAteCincoPontos")
     }
 
+    // A tela principal já controla a rolagem vertical. Não criar uma
+    // segunda área vertical rolável aqui, pois o Compose pode medir a
+    // rolagem interna com altura ilimitada e encerrar o app.
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+        modifier = Modifier.fillMaxWidth()
     ) {
 
         Text(
