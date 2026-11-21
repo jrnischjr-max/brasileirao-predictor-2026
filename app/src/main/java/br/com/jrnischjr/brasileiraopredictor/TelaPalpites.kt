@@ -873,15 +873,6 @@ fun TelaPalpites(
             )
         }
 
-        if (erroBaseHistorica.isNotEmpty()) {
-            Text(
-                erroBaseHistorica,
-                color = Color.LightGray,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-        }
-
         if (erro.isNotEmpty()) {
             Text(erro, color = Color.White)
 
