@@ -835,7 +835,7 @@ fun TelaPrincipal(
         carregandoJogos = true
         erroJogos = ""
 
-        DadosBrasileirao.buscarJogos { dados, erro ->
+        DadosBrasileirao.buscarJogos(context) { dados, erro ->
             carregandoJogos = false
 
             if (dados != null) {
