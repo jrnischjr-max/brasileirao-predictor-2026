@@ -842,7 +842,11 @@ fun TelaPalpites(
         appendLine("Empate ficou até 5 pontos do favorito: $empatesAteCincoPontos")
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+    ) {
 
         Text(
             "🎯 PALPITES INTELIGENTES",
@@ -997,11 +1001,15 @@ fun TelaPalpites(
                     "${jogo.optString("rodada")}_${jogo.optString("data")}_${mandante}_${visitante}"
                 }
 
-                val analise = MotorPalpites.analisar(
-                    jogo = jogo,
-                    todosJogos = todosJogosMotor,
-                    clubes = clubes.toList()
-                )
+                // Mantém a análise estatística em memória durante recomposições
+                // da tela, evitando recalcular o motor ao rolar ou editar um placar.
+                val analise = remember(idJogo, todosJogosMotor, clubes.size) {
+                    MotorPalpites.analisar(
+                        jogo = jogo,
+                        todosJogos = todosJogosMotor,
+                        clubes = clubes.toList()
+                    )
+                }
 
                 if (analise != null) {
 
