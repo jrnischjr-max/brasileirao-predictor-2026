@@ -27,7 +27,6 @@ fun TelaPalpites(
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val jogos = remember { mutableStateListOf<JSONObject>() }
-    val jogosHistoricos = remember { mutableStateListOf<JSONObject>() }
     val clubes = remember { mutableStateListOf<JSONObject>() }
     val historico = remember { mutableStateListOf<JSONObject>() }
 
@@ -35,13 +34,10 @@ fun TelaPalpites(
     var erro by remember { mutableStateOf("") }
     var jogosProntos by remember { mutableStateOf(false) }
     var tabelaPronta by remember { mutableStateOf(false) }
-    var baseHistoricaPronta by remember { mutableStateOf(false) }
-    var erroBaseHistorica by remember { mutableStateOf("") }
     var historicoCarregando by remember { mutableStateOf(false) }
     var erroHistorico by remember { mutableStateOf("") }
     var salvandoPalpite by remember { mutableStateOf(false) }
     var salvandoPalpiteUsuario by remember { mutableStateOf(false) }
-    var simulandoHistorico by remember { mutableStateOf(false) }
 
     var rodadaSelecionada by remember { mutableStateOf(0) }
     var rodadaMenuAberto by remember { mutableStateOf(false) }
@@ -125,42 +121,18 @@ fun TelaPalpites(
             }
         }
 
-        DadosBrasileirao.buscarHistorico(context) { dados, mensagem ->
-            jogosHistoricos.clear()
-            val listaHistorica = dados?.optJSONArray("jogos")
-            if (listaHistorica != null) {
-                for (i in 0 until listaHistorica.length()) {
-                    val jogo = listaHistorica.optJSONObject(i) ?: continue
-                    val temporada = jogo.optInt(
-                        "temporada",
-                        jogo.optString("data").take(4).toIntOrNull() ?: 0
-                    )
-                    // Mantém somente o Brasileirão 2025 como base histórica.
-                    if (temporada == 2025) jogosHistoricos.add(jogo)
-                }
-            }
-
-            baseHistoricaPronta = true
-            erroBaseHistorica = when {
-                dados == null -> mensagem ?: "Não foi possível carregar a base histórica."
-                jogosHistoricos.isEmpty() -> "A API não retornou partidas do Brasileirão 2025."
-                else -> "Base histórica 2025: ${jogosHistoricos.size} jogos."
-            }
-        }
     }
 
-    // O motor consulta apenas 2025 como temporada histórica e acrescenta
-    // os resultados já disponíveis do calendário atual de 2026.
-    val todosJogosMotor = remember(jogos.size, jogosHistoricos.size) {
-        (jogosHistoricos.toList() + jogos.toList())
-            .distinctBy { jogo ->
-                jogo.optString("id").ifBlank {
-                    jogo.optString("data") + "_" +
-                        jogo.optJSONObject("mandante")?.optString("nome").orEmpty() + "_" +
-                        jogo.optJSONObject("visitante")?.optString("nome").orEmpty()
-                }
-            }
-            .sortedBy { it.optString("data") }
+    // O motor recebe exclusivamente partidas do Brasileirão 2026.
+    // Apenas resultados já finalizados antes da data do jogo entram no cálculo.
+    val todosJogosMotor = remember(jogos.size) {
+        jogos.filter { jogo ->
+            val temporada = jogo.optInt(
+                "temporada",
+                jogo.optString("data").take(4).toIntOrNull() ?: 0
+            )
+            temporada == 2026
+        }.sortedBy { it.optString("data") }
     }
 
     LaunchedEffect(Unit) {
@@ -261,15 +233,9 @@ fun TelaPalpites(
     val taxaUsuario = if (finalizadosUsuario.isNotEmpty()) acertosUsuario * 100 / finalizadosUsuario.size else 0
     val taxaPlacarUsuario = if (finalizadosUsuario.isNotEmpty()) acertosPlacarUsuario * 100 / finalizadosUsuario.size else 0
 
-    val simulados = historico.filter {
-        val temporada = it.optInt(
-            "temporada",
-            it.optString("data").take(4).toIntOrNull() ?: 0
-        )
-        it.optBoolean("finalizado") &&
-            it.optString("origem") == "SIMULACAO_HISTORICA" &&
-            temporada == 2025
-    }
+    // Simulações de temporadas anteriores foram desativadas.
+    // O diagnóstico não deve recalcular estatísticas de 2025.
+    val simulados = emptyList<JSONObject>()
 
     val acertosSimulados = simulados.count { it.optBoolean("acertouResultado") }
     val taxaSimulada = if (simulados.isNotEmpty()) {
@@ -1474,47 +1440,6 @@ Row(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = corCartao)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Text("SIMULAÇÃO HISTÓRICA (SEPARADA)", color = corDestaque, fontWeight = FontWeight.Bold)
-                Text(
-                    "Partidas simuladas: ${simulados.size} • Acertos 1X2: $acertosSimulados • Taxa: $taxaSimulada%",
-                    color = Color.White,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        simulandoHistorico = true
-                        // A simulação histórica avalia somente as 380 partidas de 2025.
-                        // Não inclui jogos de 2026 nem altera palpites reais do usuário.
-                        HistoricoPalpitesNuvem.gerarSimulacaoHistorica(uid, jogosHistoricos.toList()) { quantidade, mensagem ->
-                            simulandoHistorico = false
-                            if (mensagem != null) {
-                                erroHistorico = mensagem
-                            } else {
-                                carregarHistorico()
-                                erroHistorico = "Simulação recalculada: $quantidade partidas atualizadas/adicionadas."
-                            }
-                        }
-                    },
-                    enabled = !simulandoHistorico && uid.isNotBlank() && jogosProntos &&
-                        baseHistoricaPronta && jogosHistoricos.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(if (simulandoHistorico) "GERANDO SIMULAÇÃO..." else "GERAR SIMULAÇÃO HISTÓRICA")
-                }
-                Text(
-                    "Executa somente partidas finalizadas ainda não registradas. Não altera seus palpites reais.",
-                    color = Color.LightGray,
-                    fontSize = 10.sp
-                )
-            }
-        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
