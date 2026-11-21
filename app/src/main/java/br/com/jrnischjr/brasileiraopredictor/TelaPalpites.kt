@@ -25,6 +25,7 @@ fun TelaPalpites(
     uid: String
 ) {
     val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
     val jogos = remember { mutableStateListOf<JSONObject>() }
     val jogosHistoricos = remember { mutableStateListOf<JSONObject>() }
     val clubes = remember { mutableStateListOf<JSONObject>() }
@@ -53,7 +54,7 @@ fun TelaPalpites(
         }
 
         historicoCarregando = true
-        HistoricoPalpitesNuvem.carregar(uid) { lista, mensagem ->
+        HistoricoPalpitesNuvem.carregar(uid, context) { lista, mensagem ->
             historicoCarregando = false
             if (lista != null) {
                 historico.clear()
