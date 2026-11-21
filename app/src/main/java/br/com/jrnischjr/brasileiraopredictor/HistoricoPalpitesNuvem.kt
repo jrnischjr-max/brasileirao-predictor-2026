@@ -5,10 +5,14 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.DocumentSnapshot
 import org.json.JSONObject
+import org.json.JSONArray
+import java.io.File
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 import java.util.concurrent.Executors
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 
@@ -33,6 +37,55 @@ object HistoricoPalpitesNuvem {
         db.collection("users")
             .document(uid)
             .collection("historicoPalpites")
+
+    private fun arquivoCache(context: Context, uid: String): File {
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(uid.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        return File(context.applicationContext.cacheDir, "historico_usuario_$hash.json")
+    }
+
+    private fun lerCache(context: Context, uid: String): List<JSONObject>? {
+        return try {
+            val arquivo = arquivoCache(context, uid)
+            if (!arquivo.exists() || arquivo.length() == 0L) return null
+            val array = JSONArray(arquivo.readText(Charsets.UTF_8))
+            (0 until array.length()).mapNotNull { array.optJSONObject(it) }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun gravarCache(context: Context, uid: String, lista: List<JSONObject>) {
+        try {
+            val arquivo = arquivoCache(context, uid)
+            val temporario = File(arquivo.parentFile, "${arquivo.name}.tmp")
+            val array = JSONArray()
+            lista.forEach { array.put(it) }
+            temporario.writeText(array.toString(), Charsets.UTF_8)
+            if (!temporario.renameTo(arquivo)) {
+                arquivo.writeText(array.toString(), Charsets.UTF_8)
+                temporario.delete()
+            }
+        } catch (_: Exception) {
+            // O cache é auxiliar: falhas locais não podem bloquear o Firebase.
+        }
+    }
+
+    fun carregar(
+        uid: String,
+        context: Context,
+        callback: (List<JSONObject>?, String?) -> Unit
+    ) {
+        val cache = lerCache(context, uid)
+        if (cache != null) {
+            mainHandler.post { callback(cache, null) }
+        }
+        carregar(uid) { lista, erro ->
+            if (lista != null) gravarCache(context, uid, lista)
+            if (lista != null || cache == null) callback(lista, erro)
+        }
+    }
 
     fun carregar(
         uid: String,
