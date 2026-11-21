@@ -57,6 +57,14 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 
+private data class ItemRanking(
+    val position: Int,
+    val nickname: String,
+    val points: Int,
+    val correct: Int,
+    val exactScores: Int
+)
+
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -755,6 +763,10 @@ fun TelaPrincipal(
     onVincularGoogle: () -> Unit
 ) {
     val context = LocalContext.current
+    val dbRanking = remember { FirebaseFirestore.getInstance() }
+    var rankingTop10 by remember { mutableStateOf<List<ItemRanking>>(emptyList()) }
+    var rankingCarregando by remember { mutableStateOf(false) }
+    var rankingErro by remember { mutableStateOf("") }
     var abaSelecionada by remember { mutableStateOf("Início") }
     var carregandoJogos by remember { mutableStateOf(false) }
     var erroJogos by remember { mutableStateOf("") }
@@ -764,6 +776,32 @@ fun TelaPrincipal(
 
     val jogos = remember {
         mutableStateListOf<org.json.JSONObject>()
+    }
+
+    LaunchedEffect(uid, abaSelecionada) {
+        if (uid.isNotBlank() && abaSelecionada == "Início") {
+            rankingCarregando = true
+            rankingErro = ""
+            dbRanking.collection("rankings").document("2026").get()
+                .addOnSuccessListener { documento ->
+                    val registros = documento.get("top10") as? List<*>
+                    rankingTop10 = registros.orEmpty().mapNotNull { bruto ->
+                        val item = bruto as? Map<*, *> ?: return@mapNotNull null
+                        ItemRanking(
+                            position = (item["position"] as? Number)?.toInt() ?: 0,
+                            nickname = item["nickname"]?.toString() ?: "Torcedor",
+                            points = (item["points"] as? Number)?.toInt() ?: 0,
+                            correct = (item["correct"] as? Number)?.toInt() ?: 0,
+                            exactScores = (item["exactScores"] as? Number)?.toInt() ?: 0
+                        )
+                    }
+                    rankingCarregando = false
+                }
+                .addOnFailureListener { erro ->
+                    rankingErro = erro.localizedMessage ?: "Não foi possível carregar o ranking."
+                    rankingCarregando = false
+                }
+        }
     }
 
     val corFundo = when (time) {
@@ -1035,6 +1073,81 @@ fun TelaPrincipal(
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(20.dp)
                             )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(22.dp))
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = corCartao)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "🏆 RANKING DOS TORCEDORES 2026",
+                                color = corDestaque,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Top 10 • Atualização diária às 06h",
+                                color = Color.LightGray,
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            when {
+                                rankingCarregando && rankingTop10.isEmpty() -> {
+                                    Text("Carregando ranking...", color = Color.White, fontSize = 13.sp)
+                                }
+                                rankingErro.isNotBlank() && rankingTop10.isEmpty() -> {
+                                    Text(
+                                        "Ranking temporariamente indisponível.",
+                                        color = Color.LightGray,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                                rankingTop10.isEmpty() -> {
+                                    Text(
+                                        "A classificação será exibida após a primeira apuração.",
+                                        color = Color.LightGray,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                                else -> {
+                                    rankingTop10.forEach { participante ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "${participante.position}. ${participante.nickname}",
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Text(
+                                                "${participante.points} pts",
+                                                color = corDestaque,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Text(
+                                            "${participante.correct} acertos • ${participante.exactScores} placares exatos",
+                                            color = Color.LightGray,
+                                            fontSize = 10.sp
+                                        )
+                                        if (participante.position != rankingTop10.size) {
+                                            HorizontalDivider(color = Color.White.copy(alpha = 0.10f))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
