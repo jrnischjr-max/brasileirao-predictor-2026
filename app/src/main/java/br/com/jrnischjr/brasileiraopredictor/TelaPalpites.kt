@@ -88,7 +88,7 @@ fun TelaPalpites(
         jogosProntos = false
         tabelaPronta = false
 
-        DadosBrasileirao.buscarJogos { dados, mensagem ->
+        DadosBrasileirao.buscarJogos(context) { dados, mensagem ->
             if (dados != null) {
                 jogos.clear()
                 val lista = dados.optJSONArray("jogos")
@@ -106,7 +106,7 @@ fun TelaPalpites(
             }
         }
 
-        DadosBrasileirao.buscarClassificacao { dados, mensagem ->
+        DadosBrasileirao.buscarClassificacao(context) { dados, mensagem ->
             if (dados != null) {
                 clubes.clear()
                 val lista = dados.optJSONArray("classificacao")
@@ -124,7 +124,7 @@ fun TelaPalpites(
             }
         }
 
-        DadosBrasileirao.buscarHistorico { dados, mensagem ->
+        DadosBrasileirao.buscarHistorico(context) { dados, mensagem ->
             jogosHistoricos.clear()
             val listaHistorica = dados?.optJSONArray("jogos")
             if (listaHistorica != null) {
