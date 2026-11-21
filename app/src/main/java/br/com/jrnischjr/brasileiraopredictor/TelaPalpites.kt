@@ -167,6 +167,12 @@ fun TelaPalpites(
         carregarDados()
     }
 
+    // Recupera automaticamente os palpites da conta sempre que a tela abrir
+    // ou quando o usuário autenticado mudar.
+    LaunchedEffect(uid) {
+        if (uid.isNotBlank()) carregarHistorico()
+    }
+
     LaunchedEffect(jogosProntos, tabelaPronta) {
         if (jogosProntos && tabelaPronta) {
             carregando = false
