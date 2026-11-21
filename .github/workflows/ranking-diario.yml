@@ -37,6 +37,6 @@ jobs:
 
       - name: Calcular e publicar Top 10
         env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: \${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           BRASILEIRAO_API_URL: https://cold-sbrasileirao-predictor-apiilence-07ef.jrnischjr.workers.dev/
         run: python scripts/atualizar_ranking.py
