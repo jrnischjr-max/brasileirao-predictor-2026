@@ -42,7 +42,7 @@ object HistoricoPalpitesNuvem {
         val hash = MessageDigest.getInstance("SHA-256")
             .digest(uid.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
-        return File(context.applicationContext.cacheDir, "historico_usuario_$hash.json")
+        return File(context.applicationContext.filesDir, "historico_usuario_$hash.json")
     }
 
     private fun lerCache(context: Context, uid: String): List<JSONObject>? {
