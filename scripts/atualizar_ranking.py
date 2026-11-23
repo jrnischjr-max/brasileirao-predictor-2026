@@ -98,6 +98,7 @@ def main() -> None:
 
     leaderboard = []
     evaluated_matches = set()
+    profeta_predictions: dict[str, tuple[dict, int, int]] = {}
     for user_doc in db.collection("users").stream():
         uid = user_doc.id
         profile = user_doc.to_dict() or {}
@@ -112,11 +113,8 @@ def main() -> None:
 
         for prediction_doc in predictions:
             prediction = prediction_doc.to_dict() or {}
-            # Só considera palpites digitados pelo participante, nunca simulações
-            # históricas ou previsões automáticas do motor.
+            # Simulações retrospectivas nunca entram na disputa.
             if prediction.get("origem") == "SIMULACAO_HISTORICA":
-                continue
-            if "usuarioPlacarCasa" not in prediction or "usuarioPlacarFora" not in prediction:
                 continue
 
             game_id = str(prediction.get("idJogo") or prediction_doc.id)
@@ -128,6 +126,26 @@ def main() -> None:
                     normalize(prediction.get("visitante")),
                 ))
             if match is None:
+                continue
+
+            # O Profeta usa o palpite do motor que foi salvo antes do jogo.
+            # Como o motor é igual para todos, basta um registro por partida.
+            # Não recalculamos previsões depois de conhecer o resultado.
+            if "placarCasa" in prediction and "placarFora" in prediction:
+                ai_key = str(match.get("id") or match_key(match))
+                if ai_key not in profeta_predictions:
+                    try:
+                        profeta_predictions[ai_key] = (
+                            match,
+                            int(prediction["placarCasa"]),
+                            int(prediction["placarFora"]),
+                        )
+                    except (TypeError, ValueError):
+                        pass
+
+            # A pontuação individual continua usando exclusivamente o placar
+            # digitado pelo próprio torcedor.
+            if "usuarioPlacarCasa" not in prediction or "usuarioPlacarFora" not in prediction:
                 continue
 
             try:
@@ -157,6 +175,33 @@ def main() -> None:
                 "exactScores": exact,
                 "evaluated": evaluated,
             })
+
+    # Participante oficial da IA: usa snapshots do próprio motor salvos
+    # antes do início das partidas por usuários do app.
+    ai_points = ai_exact = ai_correct = ai_evaluated = 0
+    for match, predicted_home, predicted_away in profeta_predictions.values():
+        actual_home, actual_away = match["_score"]
+        ai_evaluated += 1
+        evaluated_matches.add(str(match.get("id") or match_key(match)))
+
+        exact_hit = predicted_home == actual_home and predicted_away == actual_away
+        result_hit = outcome(predicted_home, predicted_away) == outcome(actual_home, actual_away)
+        if exact_hit:
+            ai_exact += 1
+            ai_correct += 1
+            ai_points += 3
+        elif result_hit:
+            ai_correct += 1
+            ai_points += 1
+
+    if ai_evaluated:
+        leaderboard.append({
+            "nickname": "Brasileirão, o Profeta",
+            "points": ai_points,
+            "correct": ai_correct,
+            "exactScores": ai_exact,
+            "evaluated": ai_evaluated,
+        })
 
     leaderboard.sort(
         key=lambda item: (
