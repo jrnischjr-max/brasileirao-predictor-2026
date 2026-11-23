@@ -1133,12 +1133,19 @@ fun TelaPrincipal(
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 if (rankingRodadaReferencia > 0)
-                                    "Top 10 • Atualização diária às 06h • Evolução desde a rodada $rankingRodadaReferencia"
+                                    "Top 10 • Atualização diária às 06h • Rodada $rankingRodadaReferencia"
                                 else
                                     "Top 10 • Atualização diária às 06h • Aguardando rodada completa",
                                 color = Color.LightGray,
                                 fontSize = 11.sp
                             )
+                            if (rankingRodadaReferencia > 0) {
+                                Text(
+                                    "↑ Subiu • ↓ Caiu • → Manteve • NOVO = estreia",
+                                    color = Color.LightGray,
+                                    fontSize = 10.sp
+                                )
+                            }
                             Spacer(modifier = Modifier.height(12.dp))
 
                             when {
