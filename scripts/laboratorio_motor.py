@@ -107,36 +107,124 @@ def elo_prob(match: Match, history: list[Match]) -> tuple[float, float, float]:
                             (1 - draw_rate) * (1 - decisive_home)))
 
 
-def poisson_prob(match: Match, history: list[Match]) -> tuple[float, float, float]:
+def historical_team_stats(history: list[Match]) -> dict[str, dict[str, float]]:
+    stats: dict[str, dict[str, float]] = {}
+    for match in history:
+        home = stats.setdefault(match.home.casefold(), {"name": match.home, "games": 0, "points": 0})
+        away = stats.setdefault(match.away.casefold(), {"name": match.away, "games": 0, "points": 0})
+        home["games"] += 1
+        away["games"] += 1
+        if match.hg > match.ag:
+            home["points"] += 3
+        elif match.hg < match.ag:
+            away["points"] += 3
+        else:
+            home["points"] += 1
+            away["points"] += 1
+    return stats
+
+
+def recent_form(name: str, history: list[Match], stats: dict[str, dict[str, float]]) -> tuple[float, str]:
+    recent = [m for m in history if m.home.casefold() == name.casefold()
+              or m.away.casefold() == name.casefold()][-5:][::-1]
+    if not recent:
+        return 1.0, "Sem histórico"
+
+    averages = [v["points"] / v["games"] for v in stats.values() if v["games"] > 0]
+    league_ppg = sum(averages) / len(averages) if averages else 1.5
+    weighted_points = weight_total = goal_diff = 0.0
+    form = []
+    for index, match in enumerate(recent):
+        weight = float(5 - index)
+        at_home = match.home.casefold() == name.casefold()
+        scored, conceded = (match.hg, match.ag) if at_home else (match.ag, match.hg)
+        points = 3.0 if scored > conceded else 1.0 if scored == conceded else 0.0
+        opponent = match.away if at_home else match.home
+        opponent_stats = stats.get(opponent.casefold())
+        opponent_ppg = (opponent_stats["points"] / opponent_stats["games"]
+                        if opponent_stats and opponent_stats["games"] > 0 else league_ppg)
+        opponent_adjustment = min(1.15, max(0.85, 0.85 + 0.15 * opponent_ppg / league_ppg))
+        weighted_points += points * opponent_adjustment * weight
+        weight_total += weight
+        goal_diff += scored - conceded
+        form.append("V" if points == 3.0 else "E" if points == 1.0 else "D")
+
+    average_points = weighted_points / weight_total
+    average_goal_diff = goal_diff / len(recent)
+    factor = min(1.15, max(0.85, 1.0 + (average_points - 1.5) * 0.07
+                            + average_goal_diff * 0.035))
+    return factor, "".join(form)
+
+
+def head_to_head_factor(home: str, away: str, history: list[Match]) -> float:
+    meetings = [m for m in history if
+                (m.home.casefold() == home.casefold() and m.away.casefold() == away.casefold())
+                or (m.home.casefold() == away.casefold() and m.away.casefold() == home.casefold())][-10:]
+    if not meetings:
+        return 1.0
+    weighted_balance = total_weight = 0.0
+    for index, match in enumerate(meetings):
+        weight = float(index + 1)
+        home_was_home = match.home.casefold() == home.casefold()
+        home_goals, away_goals = (match.hg, match.ag) if home_was_home else (match.ag, match.hg)
+        result = 1.0 if home_goals > away_goals else -1.0 if home_goals < away_goals else 0.0
+        weighted_balance += result * weight
+        total_weight += weight
+    balance = weighted_balance / total_weight if total_weight else 0.0
+    return min(1.035, max(0.965, 1.0 + balance * 0.035))
+
+
+def poisson_engine(match: Match, history: list[Match]) -> tuple[tuple[float, float, float], float, float]:
     league_home = sum(m.hg for m in history) / len(history) if history else 1.35
     league_away = sum(m.ag for m in history) / len(history) if history else 1.10
     league_home, league_away = max(0.2, league_home), max(0.2, league_away)
 
-    home_home = [m for m in history if m.home.casefold() == match.home.casefold()][-8:]
-    away_away = [m for m in history if m.away.casefold() == match.away.casefold()][-8:]
+    home_games = [m for m in history if m.home.casefold() == match.home.casefold()]
+    away_games = [m for m in history if m.away.casefold() == match.away.casefold()]
 
-    def smoothed(values: list[int], reference: float) -> float:
-        observed = sum(values) / len(values) if values else reference
-        reliability = len(values) / (len(values) + 4.0)
+    def weighted_goals(games: list[Match], name: str, scored: bool) -> float:
+        recent = games[-8:]
+        if not recent:
+            return 0.0
+        weighted_sum = weight_total = 0.0
+        for index, old in enumerate(recent):
+            goals = (old.hg if scored else old.ag) if old.home.casefold() == name.casefold() else (old.ag if scored else old.hg)
+            weight = float(index + 1)
+            weighted_sum += goals * weight
+            weight_total += weight
+        return weighted_sum / weight_total if weight_total else 0.0
+
+    def smooth(observed: float, reference: float, count: int) -> float:
+        reliability = count / (count + 4.0)
         return reference + (observed - reference) * reliability
 
-    home_attack = smoothed([m.hg for m in home_home], league_home)
-    home_defence = smoothed([m.ag for m in home_home], league_away)
-    away_attack = smoothed([m.ag for m in away_away], league_away)
-    away_defence = smoothed([m.hg for m in away_away], league_home)
+    home_attack = smooth(weighted_goals(home_games, match.home, True) if home_games else league_home,
+                         league_home, len(home_games))
+    home_defence = smooth(weighted_goals(home_games, match.home, False) if home_games else league_away,
+                           league_away, len(home_games))
+    away_attack = smooth(weighted_goals(away_games, match.away, True) if away_games else league_away,
+                         league_away, len(away_games))
+    away_defence = smooth(weighted_goals(away_games, match.away, False) if away_games else league_home,
+                           league_home, len(away_games))
 
-    expected_home = league_home * math.sqrt(
-        max(0.12, home_attack / league_home) * max(0.12, away_defence / league_home)
-    )
-    expected_away = league_away * math.sqrt(
-        max(0.12, away_attack / league_away) * max(0.12, home_defence / league_away)
-    )
-    expected_home = min(3.8, max(0.15, expected_home))
-    expected_away = min(3.8, max(0.15, expected_away))
+    attack_home_factor = min(2.5, max(0.35, home_attack / league_home))
+    defence_away_factor = min(2.5, max(0.35, away_defence / league_home))
+    attack_away_factor = min(2.5, max(0.35, away_attack / league_away))
+    defence_home_factor = min(2.5, max(0.35, home_defence / league_away))
+
+    stats = historical_team_stats(history)
+    home_form, _ = recent_form(match.home, history, stats)
+    away_form, _ = recent_form(match.away, history, stats)
+    h2h = head_to_head_factor(match.home, match.away, history)
+
+    expected_home = min(3.8, max(0.15, league_home *
+        math.sqrt(attack_home_factor * defence_away_factor) * home_form * h2h))
+    expected_away = min(3.8, max(0.15, league_away *
+        math.sqrt(attack_away_factor * defence_home_factor) * away_form * (2.0 - h2h)))
 
     home = draw = away = 0.0
-    for hg in range(11):
-        for ag in range(11):
+    for hg in range(9):
+        for ag in range(9):
             chance = poisson(expected_home, hg) * poisson(expected_away, ag)
             if hg > ag:
                 home += chance
@@ -144,21 +232,64 @@ def poisson_prob(match: Match, history: list[Match]) -> tuple[float, float, floa
                 draw += chance
             else:
                 away += chance
-    return normalize_probs((home, draw, away))
+    return normalize_probs((home, draw, away)), expected_home, expected_away
 
+
+def kotlin_round(value: float) -> int:
+    # Equivalente a kotlin.math.roundToInt para valores não negativos.
+    return math.floor(value + 0.5)
+
+
+def score_outcome(home_goals: int, away_goals: int) -> int:
+    return 0 if home_goals > away_goals else 1 if home_goals == away_goals else 2
+
+
+def score_based_metrics(rows: list[dict]) -> dict:
+    if not rows:
+        return {"games": 0, "accuracy": 0.0, "exact_score_rate": 0.0,
+                "per_class": {}, "confusion_matrix": [[0, 0, 0] for _ in range(3)]}
+    matrix = [[0, 0, 0] for _ in range(3)]
+    exact = correct = 0
+    for row in rows:
+        pred = row["score_outcome"]
+        actual = row["actual"]
+        matrix[actual][pred] += 1
+        correct += int(pred == actual)
+        exact += int(row["predicted_home_goals"] == row["actual_home_goals"]
+                     and row["predicted_away_goals"] == row["actual_away_goals"])
+    per_class = {}
+    for i, name in enumerate(CLASSES):
+        tp = matrix[i][i]
+        fp = sum(matrix[r][i] for r in range(3) if r != i)
+        fn = sum(matrix[i][c] for c in range(3) if c != i)
+        precision = tp / (tp + fp) if tp + fp else 0.0
+        recall = tp / (tp + fn) if tp + fn else 0.0
+        per_class[name] = {"precision": precision, "recall": recall,
+                           "predicted": sum(matrix[r][i] for r in range(3)), "correct": tp}
+    return {"games": len(rows), "accuracy": correct / len(rows),
+            "exact_score_rate": exact / len(rows), "per_class": per_class,
+            "confusion_matrix": matrix}
 
 def predict(match: Match, all_matches: list[Match]) -> dict:
     # Regra conservadora: nenhuma partida da mesma data entra no contexto.
     history = [m for m in all_matches if m.date < match.date]
     elo = elo_prob(match, history)
-    pois = poisson_prob(match, history)
+    pois, expected_home, expected_away = poisson_engine(match, history)
     blend = normalize_probs(tuple((a + b) / 2 for a, b in zip(elo, pois)))
-    actual = 0 if match.hg > match.ag else 1 if match.hg == match.ag else 2
+    predicted_home, predicted_away = kotlin_round(expected_home), kotlin_round(expected_away)
+    actual = score_outcome(match.hg, match.ag)
     return {
         "actual": actual,
         "elo": elo,
         "poisson": pois,
         "blend": blend,
+        "score_outcome": score_outcome(predicted_home, predicted_away),
+        "predicted_home_goals": predicted_home,
+        "predicted_away_goals": predicted_away,
+        "actual_home_goals": match.hg,
+        "actual_away_goals": match.ag,
+        "expected_home_goals": expected_home,
+        "expected_away_goals": expected_away,
         "date": match.date,
         "home": match.home,
         "away": match.away,
@@ -245,6 +376,13 @@ def main() -> None:
             "train": score_metrics(train, model),
             "test": score_metrics(test, model),
         }
+    # Reprodução do fluxo oficial: probabilidades 1X2 do Elo e placar
+    # exibido calculado pelo Poisson contextual, com forma e H2H.
+    models["motor_kotlin_score"] = {
+        "train": score_based_metrics(train),
+        "test": score_based_metrics(test),
+        "result_source": "placar exibido arredondado, igual à regra de avaliação do app",
+    }
     models["blend_contextual_draw"] = {
         "train": train_threshold_metrics,
         "test": score_metrics(test, "blend", threshold),
@@ -262,13 +400,16 @@ def main() -> None:
         "same_day_excluded": True,
         "train_test_split_by_date": True,
         "official_engine_changed": False,
+        "kotlin_engine_parity": True,
         "models": models,
         "notes": [
             "Laboratório independente; nenhum resultado altera o motor oficial.",
             "Cada previsão usa somente partidas finalizadas em datas anteriores à partida-alvo.",
             "Ajuste do detector contextual é escolhido exclusivamente no bloco de treino.",
             "Brier é a soma dos erros quadráticos das três classes, média por partida; menor é melhor.",
-            "Este laboratório é uma aproximação Python independente e não substitui a validação do Kotlin em produção."
+            "O bloco motor_kotlin_score reproduz o Poisson contextual do Kotlin (forma recente, força do adversário e H2H) e arredondamento do placar.",
+            "As probabilidades 1X2 oficiais do app continuam sendo Elo; o critério de acerto do histórico segue o placar exibido.",
+            "O laboratório deriva a força dos adversários somente dos jogos anteriores à partida, sem usar a tabela atual."
         ],
     }
     OUTPUT.mkdir(exist_ok=True)
@@ -293,6 +434,13 @@ def main() -> None:
         m = models[key]["test"]
         d = m["per_class"]["empate"]
         lines.append(f"| {label} | {pct(m['accuracy'])} ({m['games'] and round(m['accuracy']*m['games'])}/{m['games']}) | {pct(m['macro_f1'])} | {m['brier']:.4f} | {d['predicted']} | {d['correct']} |")
+    kotlin_score = models["motor_kotlin_score"]["test"]
+    lines += [
+        f"| Motor Kotlin (placar contextual) | {pct(kotlin_score['accuracy'])} ({round(kotlin_score['accuracy']*kotlin_score['games'])}/{kotlin_score['games']}) | n/a | n/a | n/a | n/a |",
+        "",
+        f"Placar exato do motor contextual no teste: **{pct(kotlin_score['exact_score_rate'])}**.",
+        "",
+    ]
     contextual = models["blend_contextual_draw"]["test"]
     d = contextual["per_class"]["empate"]
     lines += [
