@@ -86,22 +86,29 @@ def normalize_probs(values: tuple[float, float, float]) -> tuple[float, float, f
     return tuple(max(0.0, x) / total for x in values)
 
 
-def elo_prob(match: Match, history: list[Match]) -> tuple[float, float, float]:
+def elo_prob(
+    match: Match,
+    history: list[Match],
+    k_factor: float = 20.0,
+    home_advantage: float = 65.0,
+    draw_prior_rate: float = 0.27,
+    draw_prior_strength: float = 20.0,
+) -> tuple[float, float, float]:
     ratings: dict[str, float] = {}
     draws = 0
     for old in history:
         h, a = old.home.casefold(), old.away.casefold()
         rh, ra = ratings.get(h, 1500.0), ratings.get(a, 1500.0)
-        expected = 1.0 / (1.0 + 10.0 ** (-(rh + 65.0 - ra) / 400.0))
+        expected = 1.0 / (1.0 + 10.0 ** (-(rh + home_advantage - ra) / 400.0))
         actual = 1.0 if old.hg > old.ag else 0.5 if old.hg == old.ag else 0.0
-        change = 20.0 * (actual - expected)
+        change = k_factor * (actual - expected)
         ratings[h], ratings[a] = rh + change, ra - change
         draws += int(old.hg == old.ag)
     total = len(history)
-    draw_rate = (draws + 5.4) / (total + 20.0)
+    draw_rate = (draws + draw_prior_rate * draw_prior_strength) / (total + draw_prior_strength)
     rh = ratings.get(match.home.casefold(), 1500.0)
     ra = ratings.get(match.away.casefold(), 1500.0)
-    expected_home = 1.0 / (1.0 + 10.0 ** (-(rh + 65.0 - ra) / 400.0))
+    expected_home = 1.0 / (1.0 + 10.0 ** (-(rh + home_advantage - ra) / 400.0))
     decisive_home = min(1.0, max(0.0, (expected_home - draw_rate / 2.0) / (1.0 - draw_rate)))
     return normalize_probs(((1 - draw_rate) * decisive_home, draw_rate,
                             (1 - draw_rate) * (1 - decisive_home)))
@@ -383,6 +390,52 @@ def best_draw_threshold(train: list[dict]) -> tuple[float, dict]:
     return best[1], best[2]
 
 
+def tune_elo_parameters(matches: list[Match], split_date: str) -> tuple[dict, dict, dict]:
+    # Busca limitada, sempre escolhida no treino cronológico e avaliada no bloco futuro.
+    grid = [
+        (k, home, draw_rate, prior_strength)
+        for k in (10.0, 15.0, 20.0, 25.0, 30.0)
+        for home in (40.0, 50.0, 60.0, 65.0, 70.0, 80.0)
+        for draw_rate in (0.22, 0.25, 0.27, 0.30)
+        for prior_strength in (10.0, 20.0, 30.0)
+    ]
+    histories = {m.date: [old for old in matches if old.date < m.date] for m in matches}
+    train_matches = [m for m in matches if m.date < split_date]
+    best_params = None
+    best_train = None
+    best_key = None
+
+    for k, home, draw_rate, prior_strength in grid:
+        rows = []
+        for match in train_matches:
+            probs = elo_prob(match, histories[match.date], k, home, draw_rate, prior_strength)
+            rows.append({"actual": score_outcome(match.hg, match.ag), "elo": probs})
+        metrics = score_metrics(rows, "elo")
+        # Brier menor é melhor; desempata por Macro-F1 e acurácia.
+        key = (metrics["brier"], -metrics["macro_f1"], -metrics["accuracy"])
+        if best_key is None or key < best_key:
+            best_key = key
+            best_params = {
+                "k_factor": k,
+                "home_advantage": home,
+                "draw_prior_rate": draw_rate,
+                "draw_prior_strength": prior_strength,
+            }
+            best_train = metrics
+
+    test_rows = []
+    for match in matches:
+        if match.date < split_date:
+            continue
+        probs = elo_prob(
+            match, histories[match.date],
+            best_params["k_factor"], best_params["home_advantage"],
+            best_params["draw_prior_rate"], best_params["draw_prior_strength"],
+        )
+        test_rows.append({"actual": score_outcome(match.hg, match.ag), "elo": probs})
+    return best_params, best_train, score_metrics(test_rows, "elo")
+
+
 def pct(value: float) -> str:
     return f"{value * 100:.1f}%"
 
@@ -415,6 +468,13 @@ def main() -> None:
         }
     # Reprodução do fluxo oficial: probabilidades 1X2 do Elo e placar
     # exibido calculado pelo Poisson contextual, com forma e H2H.
+    elo_params, elo_tuned_train, elo_tuned_test = tune_elo_parameters(matches, split_date)
+    models["elo_tuned"] = {
+        "parameters": elo_params,
+        "train": elo_tuned_train,
+        "test": elo_tuned_test,
+        "selection_metric": "Brier no treino cronológico",
+    }
     models["motor_kotlin_score"] = {
         "train": score_based_metrics(train),
         "test": score_based_metrics(test),
@@ -476,6 +536,13 @@ def main() -> None:
         m = models[key]["test"]
         d = m["per_class"]["empate"]
         lines.append(f"| {label} | {pct(m['accuracy'])} ({m['games'] and round(m['accuracy']*m['games'])}/{m['games']}) | {pct(m['macro_f1'])} | {m['brier']:.4f} | {d['predicted']} | {d['correct']} |")
+    tuned = models["elo_tuned"]["test"]
+    lines += [
+        f"| Elo calibrado no treino | {pct(tuned['accuracy'])} ({round(tuned['accuracy']*tuned['games'])}/{tuned['games']}) | {pct(tuned['macro_f1'])} | {tuned['brier']:.4f} | {tuned['per_class']['empate']['predicted']} | {tuned['per_class']['empate']['correct']} |",
+        "",
+        f"Parâmetros escolhidos somente no treino: `{json.dumps(elo_params, ensure_ascii=False)}`.",
+        "",
+    ]
     kotlin_score = models["motor_kotlin_score"]["test"]
     lines += [
         f"| Motor Kotlin (placar contextual) | {pct(kotlin_score['accuracy'])} ({round(kotlin_score['accuracy']*kotlin_score['games'])}/{kotlin_score['games']}) | n/a | n/a | n/a | n/a |",
