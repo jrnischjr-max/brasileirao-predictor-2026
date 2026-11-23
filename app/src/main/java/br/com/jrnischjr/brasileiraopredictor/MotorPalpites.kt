@@ -176,6 +176,37 @@ object MotorPalpites {
         }
     }
 
+    // Classificação reconstruída somente com jogos anteriores à partida-alvo.
+    // Não usa a tabela atual, que poderia conter resultados posteriores.
+    private fun estatisticasHistoricas(
+        partidas: List<Partida>
+    ): List<JSONObject> {
+        val estatisticas = linkedMapOf<String, IntArray>()
+
+        partidas.forEach { partida ->
+            val casa = estatisticas.getOrPut(partida.casa) { intArrayOf(0, 0) }
+            val fora = estatisticas.getOrPut(partida.fora) { intArrayOf(0, 0) }
+            casa[0]++
+            fora[0]++
+
+            when {
+                partida.golsCasa > partida.golsFora -> casa[1] += 3
+                partida.golsCasa < partida.golsFora -> fora[1] += 3
+                else -> {
+                    casa[1]++
+                    fora[1]++
+                }
+            }
+        }
+
+        return estatisticas.map { (nome, dados) ->
+            JSONObject()
+                .put("nome", nome)
+                .put("jogos", dados[0])
+                .put("pontos", dados[1])
+        }
+    }
+
     private fun formaRecente(
         nome: String,
         partidas: List<Partida>,
@@ -453,6 +484,9 @@ object MotorPalpites {
 
         if (partidas.isEmpty()) return null
 
+        // Força e forma dos adversários calculadas no corte temporal da partida.
+        val clubesHistoricos = estatisticasHistoricas(partidas)
+
         val jogosCasa = partidasDoTime(nomeCasa, partidas)
             .filter { it.casa.equals(nomeCasa, true) }
 
@@ -543,10 +577,10 @@ object MotorPalpites {
             (defesaCasa / mediaLigaFora).coerceIn(0.35, 2.5)
 
         val (formaFatorCasa, formaCasa) =
-            formaRecente(nomeCasa, partidas, clubes)
+            formaRecente(nomeCasa, partidas, clubesHistoricos)
 
         val (formaFatorFora, formaFora) =
-            formaRecente(nomeFora, partidas, clubes)
+            formaRecente(nomeFora, partidas, clubesHistoricos)
 
         val fatorConfronto = fatorConfrontoDireto(
             nomeCasa,
