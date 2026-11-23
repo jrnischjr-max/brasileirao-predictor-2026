@@ -326,7 +326,9 @@ def main() -> None:
         participant_id = entry.get("participantId", "")
         movement = latest_movement.get(participant_id)
         entry["movement"] = movement["movement"] if movement else 0
-        entry["movementStatus"] = movement["movementStatus"] if movement else "NEW"
+        entry["movementStatus"] = movement["movementStatus"] if movement else (
+            "NEW" if completed_rounds else "PENDING"
+        )
 
     # Documento único de leitura simples para o app. Não inclui UID, e-mail
     # nem histórico individual de palpites.
