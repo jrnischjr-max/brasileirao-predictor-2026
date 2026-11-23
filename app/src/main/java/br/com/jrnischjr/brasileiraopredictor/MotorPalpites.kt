@@ -604,27 +604,40 @@ object MotorPalpites {
             1.0
         ).coerceIn(0.15, 3.8)
 
-        var vitoriaCasa = 0.0
-        var empate = 0.0
-        var vitoriaFora = 0.0
+        // O resultado principal vem do Elo. O placar é escolhido pelo Poisson,
+        // mas condicionado ao mesmo resultado para nunca exibir 1x1 quando
+        // o próprio motor aponta vitória de casa ou de fora.
+        val resultadoAlvo = when {
+            probabilidadesElo.casa >= probabilidadesElo.empate &&
+                probabilidadesElo.casa >= probabilidadesElo.fora -> "CASA"
+            probabilidadesElo.empate >= probabilidadesElo.fora -> "EMPATE"
+            else -> "FORA"
+        }
+
+        var melhorChance = -1.0
+        var placarPrevistoCasa = 0
+        var placarPrevistoFora = 0
 
         for (gCasa in 0..8) {
             for (gFora in 0..8) {
-                val chance =
-                    poisson(esperadoCasa, gCasa) *
+                val chance = poisson(esperadoCasa, gCasa) *
                     poisson(esperadoFora, gFora)
 
-                when {
-                    gCasa > gFora -> vitoriaCasa += chance
-                    gCasa == gFora -> empate += chance
-                    else -> vitoriaFora += chance
+                val resultadoPlacar = when {
+                    gCasa > gFora -> "CASA"
+                    gCasa == gFora -> "EMPATE"
+                    else -> "FORA"
+                }
+
+                if (resultadoPlacar == resultadoAlvo && chance > melhorChance) {
+                    melhorChance = chance
+                    placarPrevistoCasa = gCasa
+                    placarPrevistoFora = gFora
                 }
             }
         }
 
-        val total = vitoriaCasa + empate + vitoriaFora
-
-        if (total <= 0.0) return null
+        if (melhorChance < 0.0) return null
 
         // Mantém as probabilidades completas para decidir o 1X2.
         // O arredondamento acontece apenas nos valores exibidos/salvos como inteiros.
@@ -642,8 +655,8 @@ object MotorPalpites {
             probCasa = pCasa,
             probEmpate = pEmpate,
             probFora = pFora,
-            placarCasa = esperadoCasa.roundToInt(),
-            placarFora = esperadoFora.roundToInt(),
+            placarCasa = placarPrevistoCasa,
+            placarFora = placarPrevistoFora,
             formaCasa = formaCasa,
             formaFora = formaFora,
             probCasaExata = probCasaExata,
