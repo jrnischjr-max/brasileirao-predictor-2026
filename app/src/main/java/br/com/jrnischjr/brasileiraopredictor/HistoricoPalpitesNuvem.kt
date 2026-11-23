@@ -550,9 +550,11 @@ object HistoricoPalpitesNuvem {
             val temProbabilidades = palpite.has("probCasa") &&
                 palpite.has("probEmpate") && palpite.has("probFora")
             val resultadoPrevisto = if (temProbabilidades) {
-                val probCasa = palpite.optDouble("probCasaExata", palpite.optDouble("probCasa"))
-                val probEmpate = palpite.optDouble("probEmpateExata", palpite.optDouble("probEmpate"))
-                val probFora = palpite.optDouble("probForaExata", palpite.optDouble("probFora"))
+                // Resultado 1X2 deve usar as probabilidades de vitória/empate,
+                // nunca as probabilidades de placar exato.
+                val probCasa = palpite.optDouble("probCasa")
+                val probEmpate = palpite.optDouble("probEmpate")
+                val probFora = palpite.optDouble("probFora")
                 when {
                     probCasa >= probEmpate && probCasa >= probFora -> "CASA"
                     probEmpate >= probFora -> "EMPATE"
