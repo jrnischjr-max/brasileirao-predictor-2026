@@ -42,6 +42,7 @@ fun TelaPalpites(
     var rodadaMenuAberto by remember { mutableStateOf(false) }
     var analisesPorJogo by remember { mutableStateOf<Map<String, AnalisePalpite>>(emptyMap()) }
     var calculandoAnalises by remember { mutableStateOf(false) }
+    var historicoVersao by remember { mutableStateOf(0) }
 
     fun carregarHistorico() {
         if (uid.isBlank()) {
@@ -56,6 +57,7 @@ fun TelaPalpites(
             if (lista != null) {
                 historico.clear()
                 historico.addAll(lista)
+                historicoVersao++
                 erroHistorico = ""
             } else {
                 erroHistorico = mensagem ?: "Não foi possível carregar o histórico."
@@ -144,6 +146,15 @@ fun TelaPalpites(
     // ou quando o usuário autenticado mudar.
     LaunchedEffect(uid) {
         if (uid.isNotBlank()) carregarHistorico()
+    }
+
+    // Sincroniza automaticamente os palpites salvos assim que os jogos
+    // oficiais e o histórico da conta estiverem disponíveis.
+    // A aba Jogos e a aba Palpites passam a refletir o mesmo status/placar.
+    LaunchedEffect(jogosProntos, historicoVersao, uid) {
+        if (jogosProntos && historico.isNotEmpty() && uid.isNotBlank()) {
+            atualizarHistorico()
+        }
     }
 
     LaunchedEffect(jogosProntos, tabelaPronta) {
