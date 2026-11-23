@@ -1193,6 +1193,12 @@ fun TelaPrincipal(
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
+                                                "PENDING" -> Text(
+                                                    "—",
+                                                    color = Color.LightGray,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
                                                 else -> Text(
                                                     "NOVO",
                                                     color = Color(0xFF64B5F6),
