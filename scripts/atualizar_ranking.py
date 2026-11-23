@@ -344,7 +344,9 @@ def main() -> None:
 
     print(
         f"Ranking {SEASON} publicado: {len(top10)} posições, "
-        f"{len(leaderboard)} participantes, {len(evaluated_matches)} partidas avaliadas."
+        f"{len(leaderboard)} participantes, {len(evaluated_matches)} partidas avaliadas. "
+        f"Rodadas completas: {len(round_history)}; "
+        f"movimento comparado à rodada {completed_rounds[-1] if completed_rounds else 'ainda não disponível'}."
     )
 
 
