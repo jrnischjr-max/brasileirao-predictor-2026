@@ -595,7 +595,7 @@ def main() -> None:
         "",
     ]
     (OUTPUT / "relatorio.md").write_text("\n".join(lines), encoding="utf-8")
-    print("\n".join(lines[:25]))
+    print("\n".join(lines[:40]))
 
 
 if __name__ == "__main__":
