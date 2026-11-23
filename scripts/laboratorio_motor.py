@@ -268,14 +268,24 @@ def score_outcome(home_goals: int, away_goals: int) -> int:
     return 0 if home_goals > away_goals else 1 if home_goals == away_goals else 2
 
 
-def aligned_score_metrics(rows: list[dict]) -> dict:
+def aligned_score_metrics(rows: list[dict], model: str = "elo",
+                         draw_threshold: float | None = None) -> dict:
     if not rows:
         return {"games": 0, "accuracy": 0.0, "exact_score_rate": 0.0}
     correct = exact = 0
     for row in rows:
-        correct += int(row["aligned_score_outcome"] == row["actual"])
-        exact += int(row["aligned_home_goals"] == row["actual_home_goals"]
-                     and row["aligned_away_goals"] == row["actual_away_goals"])
+        probabilities = row[model]
+        target = argmax(probabilities)
+        if draw_threshold is not None and probabilities[1] >= draw_threshold * max(
+            probabilities[0], probabilities[2]
+        ):
+            target = 1
+        home_goals, away_goals = best_score_matching_outcome(
+            row["expected_home_goals"], row["expected_away_goals"], target
+        )
+        correct += int(target == row["actual"])
+        exact += int(home_goals == row["actual_home_goals"]
+                     and away_goals == row["actual_away_goals"])
     return {"games": len(rows), "accuracy": correct / len(rows),
             "exact_score_rate": exact / len(rows)}
 
@@ -482,9 +492,15 @@ def main() -> None:
         "result_source": "placar exibido arredondado, igual à regra de avaliação do app",
     }
     models["motor_elo_aligned_score"] = {
-        "train": aligned_score_metrics(train),
-        "test": aligned_score_metrics(test),
+        "train": aligned_score_metrics(train, "elo"),
+        "test": aligned_score_metrics(test, "elo"),
         "result_source": "placar mais provável condicionado ao resultado 1X2 mais provável do Elo",
+    }
+    models["motor_blend_draw_aligned_score"] = {
+        "train": aligned_score_metrics(train, "blend", threshold),
+        "test": aligned_score_metrics(test, "blend", threshold),
+        "draw_ratio_threshold": threshold,
+        "result_source": "placar Poisson condicionado à combinação Elo/Poisson com detector de empate",
     }
     models["blend_contextual_draw"] = {
         "train": train_threshold_metrics,
@@ -561,6 +577,13 @@ def main() -> None:
         f"| Elo + placar coerente com 1X2 | {pct(aligned['accuracy'])} ({round(aligned['accuracy']*aligned['games'])}/{aligned['games']}) | n/a | n/a | n/a | n/a |",
         "",
         f"Placar exato do candidato alinhado: **{pct(aligned['exact_score_rate'])}**.",
+        "",
+    ]
+    blend_aligned = models["motor_blend_draw_aligned_score"]["test"]
+    lines += [
+        f"| Combinação + empate + placar coerente | {pct(blend_aligned['accuracy'])} ({round(blend_aligned['accuracy']*blend_aligned['games'])}/{blend_aligned['games']}) | n/a | n/a | n/a | n/a |",
+        "",
+        f"Placar exato da combinação contextual: **{pct(blend_aligned['exact_score_rate'])}**.",
         "",
     ]
     elo_contextual = models["elo_contextual_draw"]["test"]
