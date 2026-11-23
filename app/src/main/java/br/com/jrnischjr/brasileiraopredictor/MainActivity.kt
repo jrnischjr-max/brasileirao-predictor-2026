@@ -62,7 +62,9 @@ private data class ItemRanking(
     val nickname: String,
     val points: Int,
     val correct: Int,
-    val exactScores: Int
+    val exactScores: Int,
+    val movement: Int = 0,
+    val movementStatus: String = "NEW"
 )
 
 class MainActivity : FragmentActivity() {
@@ -786,6 +788,7 @@ fun TelaPrincipal(
     var rankingTop10 by remember { mutableStateOf<List<ItemRanking>>(emptyList()) }
     var rankingCarregando by remember { mutableStateOf(false) }
     var rankingErro by remember { mutableStateOf("") }
+    var rankingRodadaReferencia by remember { mutableStateOf(0) }
     var abaSelecionada by remember { mutableStateOf("Início") }
     var carregandoJogos by remember { mutableStateOf(false) }
     var erroJogos by remember { mutableStateOf("") }
@@ -803,6 +806,8 @@ fun TelaPrincipal(
             rankingErro = ""
             dbRanking.collection("rankings").document("2026").get()
                 .addOnSuccessListener { documento ->
+                    rankingRodadaReferencia =
+                        (documento.get("movementReferenceRound") as? Number)?.toInt() ?: 0
                     val registros = documento.get("top10") as? List<*>
                     rankingTop10 = registros.orEmpty().mapNotNull { bruto ->
                         val item = bruto as? Map<*, *> ?: return@mapNotNull null
@@ -811,7 +816,9 @@ fun TelaPrincipal(
                             nickname = item["nickname"]?.toString() ?: "Torcedor",
                             points = (item["points"] as? Number)?.toInt() ?: 0,
                             correct = (item["correct"] as? Number)?.toInt() ?: 0,
-                            exactScores = (item["exactScores"] as? Number)?.toInt() ?: 0
+                            exactScores = (item["exactScores"] as? Number)?.toInt() ?: 0,
+                            movement = (item["movement"] as? Number)?.toInt() ?: 0,
+                            movementStatus = item["movementStatus"]?.toString() ?: "NEW"
                         )
                     }
                     rankingCarregando = false
@@ -1125,7 +1132,10 @@ fun TelaPrincipal(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "Top 10 • Atualização diária às 06h",
+                                if (rankingRodadaReferencia > 0)
+                                    "Top 10 • Atualização diária às 06h • Evolução desde a rodada $rankingRodadaReferencia"
+                                else
+                                    "Top 10 • Atualização diária às 06h • Aguardando rodada completa",
                                 color = Color.LightGray,
                                 fontSize = 11.sp
                             )
@@ -1164,6 +1174,33 @@ fun TelaPrincipal(
                                                 fontWeight = FontWeight.SemiBold,
                                                 modifier = Modifier.weight(1f)
                                             )
+                                            when (participante.movementStatus) {
+                                                "UP" -> Text(
+                                                    "↑ ${participante.movement}",
+                                                    color = Color(0xFF4ADE80),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                "DOWN" -> Text(
+                                                    "↓ ${kotlin.math.abs(participante.movement)}",
+                                                    color = Color(0xFFFF5252),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                "SAME" -> Text(
+                                                    "→",
+                                                    color = Color.LightGray,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                else -> Text(
+                                                    "NOVO",
+                                                    color = Color(0xFF64B5F6),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
                                             Text(
                                                 "${participante.points} pts",
                                                 color = corDestaque,
