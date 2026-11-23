@@ -25,11 +25,11 @@ object HistoricoPalpitesNuvem {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private fun resultadoMaisProvavel(analise: AnalisePalpite): String {
+        // A pontuação precisa corresponder ao placar que aparece para o usuário.
         return when {
-            analise.probCasaExata >= analise.probEmpateExata &&
-                analise.probCasaExata >= analise.probForaExata -> "CASA"
-            analise.probEmpateExata >= analise.probForaExata -> "EMPATE"
-            else -> "FORA"
+            analise.placarCasa > analise.placarFora -> "CASA"
+            analise.placarCasa < analise.placarFora -> "FORA"
+            else -> "EMPATE"
         }
     }
 
@@ -547,25 +547,12 @@ object HistoricoPalpitesNuvem {
         val previstoCasa = palpite.optInt("placarCasa", -1)
         val previstoFora = palpite.optInt("placarFora", -1)
         if (previstoCasa >= 0 && previstoFora >= 0) {
-            val temProbabilidades = palpite.has("probCasa") &&
-                palpite.has("probEmpate") && palpite.has("probFora")
-            val resultadoPrevisto = if (temProbabilidades) {
-                // Resultado 1X2 deve usar as probabilidades de vitória/empate,
-                // nunca as probabilidades de placar exato.
-                val probCasa = palpite.optDouble("probCasa")
-                val probEmpate = palpite.optDouble("probEmpate")
-                val probFora = palpite.optDouble("probFora")
-                when {
-                    probCasa >= probEmpate && probCasa >= probFora -> "CASA"
-                    probEmpate >= probFora -> "EMPATE"
-                    else -> "FORA"
-                }
-            } else {
-                when {
-                    previstoCasa > previstoFora -> "CASA"
-                    previstoCasa < previstoFora -> "FORA"
-                    else -> "EMPATE"
-                }
+            // O resultado 1X2 é derivado do mesmo placar exibido no cartão.
+            // Assim, placar 1 x 1 nunca pode ser contado como vitória da casa.
+            val resultadoPrevisto = when {
+                previstoCasa > previstoFora -> "CASA"
+                previstoCasa < previstoFora -> "FORA"
+                else -> "EMPATE"
             }
             palpite.put("resultadoPrevisto", resultadoPrevisto)
             palpite.put("resultadoReal", resultadoReal)
