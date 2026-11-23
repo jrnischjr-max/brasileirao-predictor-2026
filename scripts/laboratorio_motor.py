@@ -240,8 +240,37 @@ def kotlin_round(value: float) -> int:
     return math.floor(value + 0.5)
 
 
+def best_score_matching_outcome(expected_home: float, expected_away: float,
+                                target_outcome: int) -> tuple[int, int]:
+    # Seleciona o placar conjunto mais provável dentro do resultado 1X2
+    # apontado pelo Elo. Mantém o placar coerente com a probabilidade exibida.
+    candidates = []
+    for hg in range(9):
+        for ag in range(9):
+            outcome = 0 if hg > ag else 1 if hg == ag else 2
+            if outcome != target_outcome:
+                continue
+            chance = poisson(expected_home, hg) * poisson(expected_away, ag)
+            distance = abs(hg - expected_home) + abs(ag - expected_away)
+            candidates.append((chance, -distance, -hg, -ag, hg, ag))
+    best = max(candidates)
+    return best[4], best[5]
+
+
 def score_outcome(home_goals: int, away_goals: int) -> int:
     return 0 if home_goals > away_goals else 1 if home_goals == away_goals else 2
+
+
+def aligned_score_metrics(rows: list[dict]) -> dict:
+    if not rows:
+        return {"games": 0, "accuracy": 0.0, "exact_score_rate": 0.0}
+    correct = exact = 0
+    for row in rows:
+        correct += int(row["aligned_score_outcome"] == row["actual"])
+        exact += int(row["aligned_home_goals"] == row["actual_home_goals"]
+                     and row["aligned_away_goals"] == row["actual_away_goals"])
+    return {"games": len(rows), "accuracy": correct / len(rows),
+            "exact_score_rate": exact / len(rows)}
 
 
 def score_based_metrics(rows: list[dict]) -> dict:
@@ -277,6 +306,10 @@ def predict(match: Match, all_matches: list[Match]) -> dict:
     pois, expected_home, expected_away = poisson_engine(match, history)
     blend = normalize_probs(tuple((a + b) / 2 for a, b in zip(elo, pois)))
     predicted_home, predicted_away = kotlin_round(expected_home), kotlin_round(expected_away)
+    elo_outcome = argmax(elo)
+    aligned_home, aligned_away = best_score_matching_outcome(
+        expected_home, expected_away, elo_outcome
+    )
     actual = score_outcome(match.hg, match.ag)
     return {
         "actual": actual,
@@ -284,6 +317,10 @@ def predict(match: Match, all_matches: list[Match]) -> dict:
         "poisson": pois,
         "blend": blend,
         "score_outcome": score_outcome(predicted_home, predicted_away),
+        "aligned_score_outcome": score_outcome(aligned_home, aligned_away),
+        "aligned_home_goals": aligned_home,
+        "aligned_away_goals": aligned_away,
+        "elo_outcome": elo_outcome,
         "predicted_home_goals": predicted_home,
         "predicted_away_goals": predicted_away,
         "actual_home_goals": match.hg,
@@ -383,6 +420,11 @@ def main() -> None:
         "test": score_based_metrics(test),
         "result_source": "placar exibido arredondado, igual à regra de avaliação do app",
     }
+    models["motor_elo_aligned_score"] = {
+        "train": aligned_score_metrics(train),
+        "test": aligned_score_metrics(test),
+        "result_source": "placar mais provável condicionado ao resultado 1X2 mais provável do Elo",
+    }
     models["blend_contextual_draw"] = {
         "train": train_threshold_metrics,
         "test": score_metrics(test, "blend", threshold),
@@ -439,6 +481,13 @@ def main() -> None:
         f"| Motor Kotlin (placar contextual) | {pct(kotlin_score['accuracy'])} ({round(kotlin_score['accuracy']*kotlin_score['games'])}/{kotlin_score['games']}) | n/a | n/a | n/a | n/a |",
         "",
         f"Placar exato do motor contextual no teste: **{pct(kotlin_score['exact_score_rate'])}**.",
+        "",
+    ]
+    aligned = models["motor_elo_aligned_score"]["test"]
+    lines += [
+        f"| Elo + placar coerente com 1X2 | {pct(aligned['accuracy'])} ({round(aligned['accuracy']*aligned['games'])}/{aligned['games']}) | n/a | n/a | n/a | n/a |",
+        "",
+        f"Placar exato do candidato alinhado: **{pct(aligned['exact_score_rate'])}**.",
         "",
     ]
     contextual = models["blend_contextual_draw"]["test"]
