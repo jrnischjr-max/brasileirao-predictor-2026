@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONObject
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun TelaPalpites(
@@ -38,6 +40,8 @@ fun TelaPalpites(
 
     var rodadaSelecionada by remember { mutableStateOf(0) }
     var rodadaMenuAberto by remember { mutableStateOf(false) }
+    var analisesPorJogo by remember { mutableStateOf<Map<String, AnalisePalpite>>(emptyMap()) }
+    var calculandoAnalises by remember { mutableStateOf(false) }
 
     fun carregarHistorico() {
         if (uid.isBlank()) {
@@ -216,6 +220,36 @@ fun TelaPalpites(
         .filter { it.optInt("rodada") == rodadaExibida }
         .sortedBy { it.optString("data") }
 
+    // O motor estatístico trabalha fora da thread da interface.
+    // Assim, a rolagem e os campos de palpite não ficam bloqueados pelos cálculos Elo.
+    LaunchedEffect(jogosProntos, tabelaPronta, rodadaExibida, todosJogosMotor.size, clubes.size) {
+        if (jogosProntos && tabelaPronta && erro.isEmpty()) {
+            calculandoAnalises = true
+            analisesPorJogo = emptyMap()
+            val jogosDaRodada = proximosJogos.toList()
+            val base2026 = todosJogosMotor.toList()
+            val classificacao = clubes.toList()
+
+            val resultado = withContext(Dispatchers.Default) {
+                jogosDaRodada.mapNotNull { jogo ->
+                    val mandante = nomeExibicaoClube(
+                        jogo.optJSONObject("mandante")?.optString("nome", "") ?: ""
+                    )
+                    val visitante = nomeExibicaoClube(
+                        jogo.optJSONObject("visitante")?.optString("nome", "") ?: ""
+                    )
+                    val id = jogo.optString("id").ifBlank {
+                        "${jogo.optString("rodada")}_${jogo.optString("data")}_${mandante}_${visitante}"
+                    }
+                    MotorPalpites.analisar(jogo, base2026, classificacao)?.let { id to it }
+                }.toMap()
+            }
+
+            analisesPorJogo = resultado
+            calculandoAnalises = false
+        }
+    }
+
     val finalizados = historico.filter {
         it.optBoolean("finalizado") &&
             it.optString("origem") != "SIMULACAO_HISTORICA" &&
@@ -390,6 +424,12 @@ fun TelaPalpites(
                     "Não há partidas pendentes nesta rodada.",
                     color = Color.White
                 )
+            } else if (calculandoAnalises) {
+                Text(
+                    "Calculando os palpites em segundo plano...",
+                    color = Color.LightGray,
+                    modifier = Modifier.padding(vertical = 10.dp)
+                )
             }
 
             proximosJogos.forEach { jogo ->
@@ -404,15 +444,8 @@ fun TelaPalpites(
                     "${jogo.optString("rodada")}_${jogo.optString("data")}_${mandante}_${visitante}"
                 }
 
-                // Mantém a análise estatística em memória durante recomposições
-                // da tela, evitando recalcular o motor ao rolar ou editar um placar.
-                val analise = remember(idJogo, todosJogosMotor, clubes.size) {
-                    MotorPalpites.analisar(
-                        jogo = jogo,
-                        todosJogos = todosJogosMotor,
-                        clubes = clubes.toList()
-                    )
-                }
+                // Busca o resultado previamente calculado em segundo plano.
+                val analise = analisesPorJogo[idJogo]
 
                 if (analise != null) {
 
