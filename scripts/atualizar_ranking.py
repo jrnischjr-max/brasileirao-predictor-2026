@@ -197,6 +197,7 @@ def main() -> None:
 
         if evaluated:
             leaderboard.append({
+                "participantId": participant_id,
                 "nickname": nickname[:40],
                 "points": points,
                 "correct": correct,
@@ -238,6 +239,7 @@ def main() -> None:
 
     if ai_evaluated:
         leaderboard.append({
+            "participantId": ai_id,
             "nickname": "Brasileirão, o Profeta",
             "points": ai_points,
             "correct": ai_correct,
@@ -320,23 +322,8 @@ def main() -> None:
         }
 
     # Aplica ao ranking atual a variação em relação à última rodada completa.
-    current_id_by_nickname = {
-        hashlib.sha256(
-            (b"participant:brasileirao-o-profeta" if entry["nickname"] == "Brasileirão, o Profeta"
-             else f"user:{uid}".encode("utf-8"))
-        ).hexdigest()[:16]: entry
-        for entry in []
-    }
     for entry in top10:
-        if entry["nickname"] == "Brasileirão, o Profeta":
-            participant_id = ai_id
-        else:
-            # Resolve o ID estável sem expor UID no documento público.
-            participant_id = next((
-                hashlib.sha256(f"user:{user_doc.id}".encode("utf-8")).hexdigest()[:16]
-                for user_doc in db.collection("users").stream()
-                if str((user_doc.to_dict() or {}).get("name") or "").strip()[:40] == entry["nickname"]
-            ), "")
+        participant_id = entry.get("participantId", "")
         movement = latest_movement.get(participant_id)
         entry["movement"] = movement["movement"] if movement else 0
         entry["movementStatus"] = movement["movementStatus"] if movement else "NEW"
