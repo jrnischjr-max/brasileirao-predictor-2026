@@ -1576,9 +1576,10 @@ private fun IntroSplash(onFinished: () -> Unit) {
         onFinished()
     }
 
-    // IDs dos clubes no provedor Football-Data. As imagens são carregadas
-    // diretamente dos escudos oficiais publicados pelo provedor.
-    val clubes = listOf(
+    // Participantes oficiais da Série A 2026.
+    // IDs conhecidos do Football-Data são usados quando disponíveis.
+    // Os quatro clubes promovidos exibem iniciais até termos IDs de escudos confirmados.
+    val clubes: List<Pair<String, Int?>> = listOf(
         "Flamengo" to 1783,
         "Palmeiras" to 1765,
         "Corinthians" to 1779,
@@ -1592,11 +1593,11 @@ private fun IntroSplash(onFinished: () -> Unit) {
         "Atlético-MG" to 1766,
         "Cruzeiro" to 1767,
         "Bahia" to 1764,
-        "Fortaleza" to 3984,
-        "Sport" to 3987,
+        "Athletico-PR" to null,
+        "Chapecoense" to null,
+        "Coritiba" to null,
+        "Remo" to null,
         "Vitória" to 1772,
-        "Ceará" to 3986,
-        "Juventude" to 4242,
         "Red Bull Bragantino" to 3985,
         "Mirassol" to 595
     )
@@ -1643,12 +1644,14 @@ private fun IntroSplash(onFinished: () -> Unit) {
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Black
                     )
-                    AsyncImage(
-                        model = "https://crests.football-data.org/${clube.second}.png",
-                        contentDescription = "Escudo do ${clube.first}",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
+                    clube.second?.let { idEscudo ->
+                        AsyncImage(
+                            model = "https://crests.football-data.org/${idEscudo}.png",
+                            contentDescription = "Escudo do ${clube.first}",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
                 }
             }
 
