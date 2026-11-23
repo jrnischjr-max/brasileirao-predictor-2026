@@ -381,10 +381,10 @@ def score_metrics(rows: list[dict], model: str, draw_ratio: float | None = None)
     }
 
 
-def best_draw_threshold(train: list[dict]) -> tuple[float, dict]:
+def best_draw_threshold(train: list[dict], model: str = "blend") -> tuple[float, dict]:
     candidates = [round(x / 100, 2) for x in range(50, 101, 5)]
-    results = [(score_metrics(train, "blend", t)["macro_f1"], t,
-                score_metrics(train, "blend", t)) for t in candidates]
+    results = [(score_metrics(train, model, t)["macro_f1"], t,
+                score_metrics(train, model, t)) for t in candidates]
     # Empate de métricas: prefere o limiar mais alto, que é menos agressivo.
     best = max(results, key=lambda item: (item[0], item[1]))
     return best[1], best[2]
@@ -458,7 +458,8 @@ def main() -> None:
     test = [row for row in predictions if row["date"] >= split_date]
     if len(train) < 20 or len(test) < 20:
         raise ValueError("Amostra insuficiente após separar treino/teste por data.")
-    threshold, train_threshold_metrics = best_draw_threshold(train)
+    threshold, train_threshold_metrics = best_draw_threshold(train, "blend")
+    elo_threshold, elo_train_threshold_metrics = best_draw_threshold(train, "elo")
 
     models = {}
     for model in ("elo", "poisson", "blend"):
@@ -489,6 +490,11 @@ def main() -> None:
         "train": train_threshold_metrics,
         "test": score_metrics(test, "blend", threshold),
         "draw_ratio_threshold": threshold,
+    }
+    models["elo_contextual_draw"] = {
+        "train": elo_train_threshold_metrics,
+        "test": score_metrics(test, "elo", elo_threshold),
+        "draw_ratio_threshold": elo_threshold,
     }
 
     report = {
@@ -555,6 +561,12 @@ def main() -> None:
         f"| Elo + placar coerente com 1X2 | {pct(aligned['accuracy'])} ({round(aligned['accuracy']*aligned['games'])}/{aligned['games']}) | n/a | n/a | n/a | n/a |",
         "",
         f"Placar exato do candidato alinhado: **{pct(aligned['exact_score_rate'])}**.",
+        "",
+    ]
+    elo_contextual = models["elo_contextual_draw"]["test"]
+    elo_draws = elo_contextual["per_class"]["empate"]
+    lines += [
+        f"| Elo + detector de empate ({elo_threshold:.2f}) | {pct(elo_contextual['accuracy'])} ({round(elo_contextual['accuracy']*elo_contextual['games'])}/{elo_contextual['games']}) | {pct(elo_contextual['macro_f1'])} | {elo_contextual['brier']:.4f} | {elo_draws['predicted']} | {elo_draws['correct']} |",
         "",
     ]
     contextual = models["blend_contextual_draw"]["test"]
