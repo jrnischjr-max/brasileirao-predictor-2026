@@ -69,6 +69,18 @@ def main() -> None:
         firebase_admin.initialize_app(credentials.Certificate(service_account))
     db = firestore.client()
 
+    # Guarda a classificação publicada anteriormente para medir a evolução
+    # real de um dia para o outro, sem depender do fechamento de rodadas.
+    ranking_ref = db.collection("rankings").document(str(SEASON))
+    previous_document = ranking_ref.get()
+    previous_data = previous_document.to_dict() or {}
+    previous_top10 = previous_data.get("top10") or []
+    previous_positions = {
+        str(item.get("participantId")): int(item.get("position") or 0)
+        for item in previous_top10
+        if isinstance(item, dict) and item.get("participantId")
+    }
+
     rows = fetch_matches()
     completed_by_id: dict[str, dict] = {}
     completed_by_key: dict[tuple[str, str, str], dict] = {}
@@ -321,18 +333,28 @@ def main() -> None:
             for entry in standings
         }
 
-    # Aplica ao ranking atual a variação em relação à última rodada completa.
+    # As setas do Top 10 comparam a posição publicada anteriormente
+    # com a posição atual. Assim, mudanças diárias aparecem mesmo no meio
+    # de uma rodada ou quando nem todos fizeram palpites em cada rodada.
     for entry in top10:
-        participant_id = entry.get("participantId", "")
-        movement = latest_movement.get(participant_id)
-        entry["movement"] = movement["movement"] if movement else 0
-        entry["movementStatus"] = movement["movementStatus"] if movement else (
-            "NEW" if completed_rounds else "PENDING"
-        )
+        participant_id = str(entry.get("participantId") or "")
+        old_position = previous_positions.get(participant_id)
+        new_position = int(entry.get("position") or 0)
+        if old_position is None:
+            entry["movement"] = 0
+            entry["movementStatus"] = "NEW" if previous_top10 else (
+                latest_movement.get(participant_id, {}).get("movementStatus", "PENDING")
+            )
+        else:
+            movement = old_position - new_position
+            entry["movement"] = movement
+            entry["movementStatus"] = (
+                "UP" if movement > 0 else "DOWN" if movement < 0 else "SAME"
+            )
 
     # Documento único de leitura simples para o app. Não inclui UID, e-mail
     # nem histórico individual de palpites.
-    db.collection("rankings").document(str(SEASON)).set({
+    ranking_ref.set({
         "season": SEASON,
         "updatedAt": firestore.SERVER_TIMESTAMP,
         "matchesProcessed": len(evaluated_matches),
@@ -346,7 +368,8 @@ def main() -> None:
         f"Ranking {SEASON} publicado: {len(top10)} posições, "
         f"{len(leaderboard)} participantes, {len(evaluated_matches)} partidas avaliadas. "
         f"Rodadas completas: {len(round_history)}; "
-        f"movimento comparado à rodada {completed_rounds[-1] if completed_rounds else 'ainda não disponível'}."
+        f"movimento diário comparado à publicação anterior "
+        f"({len(previous_positions)} participantes na referência anterior)."
     )
 
 
