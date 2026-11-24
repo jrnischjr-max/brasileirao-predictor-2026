@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -80,6 +81,12 @@ def main() -> None:
         for item in previous_top10
         if isinstance(item, dict) and item.get("participantId")
     }
+    previous_updated_at = previous_data.get("updatedAt")
+    previous_published_today = (
+        hasattr(previous_updated_at, "astimezone")
+        and previous_updated_at.astimezone(ZoneInfo("America/Sao_Paulo")).date()
+        == datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    )
 
     rows = fetch_matches()
     completed_by_id: dict[str, dict] = {}
@@ -286,13 +293,17 @@ def main() -> None:
     for round_number in completed_rounds:
         for participant_id, person in round_stats_by_person.items():
             stat = person["rounds"].get(round_number)
-            if not stat:
+            total_stat = cumulative.get(participant_id)
+            if stat:
+                total_stat = cumulative.setdefault(participant_id, {
+                    "points": 0, "correct": 0, "exactScores": 0, "evaluated": 0,
+                })
+                for field in ("points", "correct", "exactScores", "evaluated"):
+                    total_stat[field] += stat[field]
+            # Quem não pontuou/não palpitou nesta rodada continua na tabela
+            # com o acumulado anterior. Não pode reaparecer como NOVO.
+            if not total_stat or total_stat["evaluated"] == 0:
                 continue
-            total_stat = cumulative.setdefault(participant_id, {
-                "points": 0, "correct": 0, "exactScores": 0, "evaluated": 0,
-            })
-            for field in ("points", "correct", "exactScores", "evaluated"):
-                total_stat[field] += stat[field]
 
         standings = []
         for participant_id, person in round_stats_by_person.items():
@@ -351,6 +362,15 @@ def main() -> None:
             entry["movementStatus"] = (
                 "UP" if movement > 0 else "DOWN" if movement < 0 else "SAME"
             )
+
+        # Se o ranking já foi publicado hoje antes desta correção, o snapshot
+        # diário já foi sobrescrito. Usa a comparação entre rodadas como ponte
+        # para não perder as setas de hoje; a partir de amanhã vale o snapshot diário.
+        if previous_published_today:
+            round_movement = latest_movement.get(participant_id)
+            if round_movement:
+                entry["movement"] = round_movement["movement"]
+                entry["movementStatus"] = round_movement["movementStatus"]
 
     # Documento único de leitura simples para o app. Não inclui UID, e-mail
     # nem histórico individual de palpites.
